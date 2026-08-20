@@ -33,6 +33,7 @@ describe('ConfigGenerator', () => {
     const wfDir = path.join(tempDir, '.github', 'workflows');
     fs.mkdirSync(wfDir, { recursive: true });
     fs.writeFileSync(path.join(wfDir, 'ci.yml'), '');
+    fs.writeFileSync(path.join(tempDir, 'sgconfig.yml'), 'ruleDirs: [rules]');
 
     const detection = detectStack(tempDir);
     const yaml = generateLefthookConfig(detection);

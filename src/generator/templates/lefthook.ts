@@ -92,9 +92,11 @@ export function generateLefthookConfig(detection: StackDetectionResult): string 
       run: if command -v mix >/dev/null 2>&1; then mix credo --strict {staged_files}; fi`);
   }
 
-  // Universal: Fast structural AST search and rewriting via ast-grep
-  preCommitCommands.push(`    ast-grep-scan:
-      run: if command -v sg >/dev/null 2>&1; then sg scan; elif command -v ast-grep >/dev/null 2>&1; then ast-grep scan; fi`);
+  // Universal: Fast structural AST search and rewriting via ast-grep (when config is present)
+  if (detection.universal?.hasAstGrep) {
+    preCommitCommands.push(`    ast-grep-scan:
+      run: if command -v ast-grep >/dev/null 2>&1; then ast-grep scan; elif command -v sg >/dev/null 2>&1; then sg scan; fi`);
+  }
 
   // Universal: Fast deterministic AI slop and swallowed error detection
   preCommitCommands.push(`    aislop-scan:
