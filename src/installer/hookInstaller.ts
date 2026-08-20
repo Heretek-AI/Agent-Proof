@@ -52,8 +52,18 @@ export class HookInstaller {
     let lefthookInstalled = false;
     const installedHooks: string[] = [];
 
-    // Check if .git directory exists
-    if (!fs.existsSync(gitDir)) {
+    // Verify .git is a directory
+    try {
+      const gitStat = fs.statSync(gitDir);
+      if (!gitStat.isDirectory()) {
+        return {
+          lefthookInstalled: false,
+          gitHooksPath: gitHooksDir,
+          installedHooks: [],
+          message: 'No .git repository found. Git hooks skipped (not a git repository).',
+        };
+      }
+    } catch {
       return {
         lefthookInstalled: false,
         gitHooksPath: gitHooksDir,
@@ -62,10 +72,8 @@ export class HookInstaller {
       };
     }
 
-    // Ensure .git/hooks directory exists
-    if (!fs.existsSync(gitHooksDir)) {
-      fs.mkdirSync(gitHooksDir, { recursive: true });
-    }
+    // Ensure .git/hooks directory exists (idempotent, no TOCTOU check needed)
+    fs.mkdirSync(gitHooksDir, { recursive: true });
 
     // 1. Attempt to run `npx lefthook install` natively
     try {
@@ -94,7 +102,7 @@ else
   echo "[agent-proof] Warning: neither npx nor lefthook found. Skipping pre-commit gate."
 fi
 `;
-    fs.writeFileSync(preCommitPath, preCommitScript, { mode: 0o755 });
+    fs.writeFileSync(preCommitPath, preCommitScript, { encoding: 'utf-8', mode: 0o755, flag: 'w' });
     installedHooks.push('pre-commit');
 
     // 3. Ensure pre-push hook script exists and is executable
@@ -109,7 +117,7 @@ elif command -v lefthook >/dev/null 2>&1; then
   lefthook run pre-push
 fi
 `;
-    fs.writeFileSync(prePushPath, prePushScript, { mode: 0o755 });
+    fs.writeFileSync(prePushPath, prePushScript, { encoding: 'utf-8', mode: 0o755, flag: 'w' });
     installedHooks.push('pre-push');
 
     return {

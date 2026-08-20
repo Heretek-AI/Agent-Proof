@@ -199,14 +199,8 @@ await runStep(2, 'Running `npx @heretek-ai/agent-proof init`', async () => {
 // -----------------------------------------------------------------------------
 await runStep(3, 'Verifying Governance Permission Lock-in (chmod 0444)', async () => {
   const hooksPath = path.join(sandboxDir, '.claude', 'hooks.json');
-  const stats = fs.statSync(hooksPath);
-  const isWritable = (stats.mode & 0o200) !== 0;
 
-  if (isWritable) {
-    throw new Error(`.claude/hooks.json is writable! Expected read-only permissions (0444).`);
-  }
-
-  // Test status CLI command
+  // 1. Test status CLI command
   const statusOutput = execFileSync(process.execPath, [binPath, 'status', sandboxDir], {
     encoding: 'utf-8',
   });
@@ -214,16 +208,21 @@ await runStep(3, 'Verifying Governance Permission Lock-in (chmod 0444)', async (
     throw new Error(`Governance status check failed:\n${statusOutput}`);
   }
 
-  // Attempt unauthorized agent write and assert failure
+  // 2. Attempt unauthorized agent write directly and assert EACCES failure
+  let writeFailed = false;
   try {
-    fs.writeFileSync(hooksPath, '{"tampered": true}');
-    throw new Error('Unauthorized agent write succeeded on locked file!');
+    fs.writeFileSync(hooksPath, '{"tampered": true}', { flag: 'w' });
   } catch (err) {
     if (err.code === 'EACCES' || err.message.includes('permission denied') || err.message.includes('EACCES')) {
+      writeFailed = true;
       console.log(`   • Verified: Unauthorized agent modification blocked with ${err.code || 'EACCES'}`);
-    } else if (err.message.includes('Unauthorized agent write succeeded')) {
+    } else {
       throw err;
     }
+  }
+
+  if (!writeFailed) {
+    throw new Error('Unauthorized agent write succeeded on locked file! Expected read-only permissions (0444).');
   }
 });
 

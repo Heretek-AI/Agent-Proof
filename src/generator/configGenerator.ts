@@ -125,20 +125,26 @@ export class ConfigGenerator {
       const fullPath = path.resolve(this.rootPath, config.path);
       const dirName = path.dirname(fullPath);
 
-      // Skip file if it already exists and overwrite flag is not set
-      if (fs.existsSync(fullPath) && !this.overwrite) {
-        skippedFiles.push(config.path);
-        continue;
-      }
+      // Ensure parent directory exists recursively (idempotent, eliminates TOCTOU race)
+      fs.mkdirSync(dirName, { recursive: true });
 
-      // Ensure parent directory exists
-      if (!fs.existsSync(dirName)) {
-        fs.mkdirSync(dirName, { recursive: true });
+      if (this.overwrite) {
+        // Overwrite mode: atomic write with 'w' flag
+        fs.writeFileSync(fullPath, config.content, { encoding: 'utf-8', flag: 'w' });
+        writtenFiles.push(config.path);
+      } else {
+        // Safe mode: atomic exclusive creation with 'wx' flag (O_CREAT | O_EXCL)
+        try {
+          fs.writeFileSync(fullPath, config.content, { encoding: 'utf-8', flag: 'wx' });
+          writtenFiles.push(config.path);
+        } catch (err: any) {
+          if (err.code === 'EEXIST') {
+            skippedFiles.push(config.path);
+          } else {
+            throw err;
+          }
+        }
       }
-
-      // Write file contents to disk
-      fs.writeFileSync(fullPath, config.content, 'utf-8');
-      writtenFiles.push(config.path);
     }
 
     return {

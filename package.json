@@ -48,6 +48,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
+    "esbuild": "^0.28.2",
     "tsup": "^8.4.0",
     "typescript": "^5.7.3",
     "vitest": "^3.0.5"
@@ -68,5 +69,8 @@
     "code-quality"
   ],
   "author": "Heretek-AI",
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "esbuild": "^0.28.2"
+  }
 }
