@@ -189,4 +189,21 @@ members = ["crates/*"]
     expect(result.summary.primaryStacks).toContain('Ruby');
     expect(result.summary.primaryStacks).toContain('Elixir');
   });
+
+  it('detects Docker, Terraform, Kubernetes, Tach, and ast-grep tools', () => {
+    fs.writeFileSync(path.join(tempDir, 'Dockerfile'), 'FROM node:22-alpine');
+    fs.writeFileSync(path.join(tempDir, 'main.tf'), 'resource "aws_s3_bucket" "b" {}');
+    const k8sDir = path.join(tempDir, 'k8s');
+    fs.mkdirSync(k8sDir, { recursive: true });
+    fs.writeFileSync(path.join(k8sDir, 'deployment.yaml'), 'apiVersion: apps/v1');
+    fs.writeFileSync(path.join(tempDir, 'tach.toml'), '[[modules]]');
+    fs.writeFileSync(path.join(tempDir, 'sgconfig.yml'), 'ruleDirs: [rules]');
+
+    const result = detectStack(tempDir);
+    expect(result.infra.hasDocker).toBe(true);
+    expect(result.infra.hasTerraform).toBe(true);
+    expect(result.infra.hasKubernetes).toBe(true);
+    expect(result.python.hasTach).toBe(true);
+    expect(result.universal?.hasAstGrep).toBe(true);
+  });
 });

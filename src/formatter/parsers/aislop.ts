@@ -145,6 +145,9 @@ function detectRuleFromMessage(msg: string = ''): string {
   if (m.includes('dead') || m.includes('unused')) {
     return 'AI_SLOP_DEAD_CODE';
   }
+  if (m.includes('suppress') || m.includes('ts-ignore') || m.includes('noqa') || m.includes('biome-ignore')) {
+    return 'AI_SLOP_UNAUTHORIZED_SUPPRESSION';
+  }
   return 'AI_SLOP_PATTERN_DETECTED';
 }
 
@@ -196,6 +199,16 @@ function generateAislopRepair(ruleId: string = '', snippet?: string): Diagnostic
       description: 'Replace unsafe `any` cast with a validated schema parser (such as Zod) or a specific TypeScript interface/type guard.',
       repair_tokens: [
         'if (!isValidPayload(data)) throw new Error("Invalid payload");',
+      ],
+    };
+  }
+
+  if (r.includes('SUPPRESS') || r.includes('TS-IGNORE') || r.includes('NOQA')) {
+    return {
+      action: 'REWRITE_BLOCK',
+      description: 'Remove unauthorized suppression comment. Fix the underlying type or lint issue rather than bypassing governance.',
+      repair_tokens: [
+        '// Remove suppression comment and fix root cause with type guards or explicit handling',
       ],
     };
   }

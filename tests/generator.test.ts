@@ -42,12 +42,15 @@ describe('ConfigGenerator', () => {
     expect(yaml).toContain('parallel: true');
     expect(yaml).toContain('biome check --staged');
     expect(yaml).toContain('ruff check --staged --fix');
+    expect(yaml).toContain('tach check');
     expect(yaml).toContain('gosec -quiet ./...');
     expect(yaml).toContain('cargo deny check');
+    expect(yaml).toContain('ast-grep');
     expect(yaml).toContain('aislop scan --staged');
     expect(yaml).toContain('trufflehog git file://. --staged --only-verified');
     expect(yaml).toContain('typos --staged');
     expect(yaml).toContain('actionlint');
+    expect(yaml).toContain('zizmor');
 
     // Stage 3 (Pre-Push / CI) assertions
     expect(yaml).toContain('pre-push:');

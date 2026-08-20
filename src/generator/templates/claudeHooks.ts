@@ -56,6 +56,22 @@ export function generateClaudeHooksConfig(detection: StackDetectionResult): stri
     });
   }
 
+  // Workflows: Fast GitHub Actions static security analysis via zizmor
+  if (detection.infra.hasWorkflows) {
+    postFileEditRules.push({
+      matcher: '.github/workflows/*.{yml,yaml}',
+      command: 'if command -v zizmor >/dev/null 2>&1; then zizmor ${filePath}; fi',
+    });
+  }
+
+  // Containers: Fast Dockerfile static analysis via hadolint
+  if (detection.infra.hasDocker) {
+    postFileEditRules.push({
+      matcher: '{Dockerfile*,Containerfile*}',
+      command: 'if command -v hadolint >/dev/null 2>&1; then hadolint ${filePath}; fi',
+    });
+  }
+
   // Skill files: Validate agent skills against schema and OWASP agentic boundaries
   postFileEditRules.push({
     matcher: '.claude/skills/*.md',

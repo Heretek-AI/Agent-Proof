@@ -4,6 +4,7 @@
  *
  * Enforces zero-tolerance rules for AI code smells:
  * - Swallowed errors and empty catch blocks
+ * - Unauthorized suppression comments (Suppression Hygiene)
  * - Unsafe type casts (as any)
  * - Hallucinated imports
  * - Insecure YAML deserialization (yaml.load without SafeLoader)
@@ -13,7 +14,7 @@
 
 /**
  * Generate an AISlop configuration defining deterministic rules against
- * swallowed errors, empty catch blocks, hallucinated imports, and unsafe patterns.
+ * swallowed errors, empty catch blocks, hallucinated imports, unauthorized suppressions, and unsafe patterns.
  *
  * @returns Formatted YAML string for .aislop/config.yml
  */
@@ -33,6 +34,12 @@ rules:
   empty_catch_blocks:
     severity: error
     fail_score: 25
+    enabled: true
+
+  # Strict suppression hygiene: forbid blind suppression comments (@ts-ignore, # noqa)
+  unauthorized_suppressions:
+    severity: error
+    fail_score: 50
     enabled: true
 
   # Hallucinated or non-existent imports

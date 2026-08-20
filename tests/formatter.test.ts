@@ -162,4 +162,43 @@ src/api.py:25:5: E722 Do not use bare 'except'`;
     expect(envelope.summary.total_errors).toBe(0);
     expect(envelope.diagnostics.length).toBe(0);
   });
+
+  it('formats zizmor workflow security findings', () => {
+    const raw = `.github/workflows/deploy.yml:24:9: [unpinned-uses] unpinned action usage`;
+    const envelope = formatDiagnostics(raw, { toolName: 'zizmor' });
+
+    expect(envelope.status).toBe('GATE_FAILED');
+    expect(envelope.diagnostics[0].source).toBe('zizmor');
+    expect(envelope.diagnostics[0].rule_id).toBe('unpinned-uses');
+    expect(envelope.diagnostics[0].file_path).toBe('.github/workflows/deploy.yml');
+    expect(envelope.diagnostics[0].repair_instruction?.repair_tokens[0]).toContain('actions/checkout@');
+  });
+
+  it('formats hadolint Dockerfile static analysis errors', () => {
+    const raw = `Dockerfile:10 DL3008 warning: Pin versions in apt get install`;
+    const envelope = formatDiagnostics(raw, { toolName: 'hadolint' });
+
+    expect(envelope.status).toBe('GATE_PASSED'); // warning severity
+    expect(envelope.diagnostics[0].source).toBe('hadolint');
+    expect(envelope.diagnostics[0].rule_id).toBe('DL3008');
+    expect(envelope.diagnostics[0].repair_instruction?.repair_tokens[0]).toContain('apt-get install');
+  });
+
+  it('formats tfsec IaC security violations', () => {
+    const raw = `terraform/main.tf:15 [HIGH] S3 Bucket Encryption disabled (aws-s3-enable-bucket-encryption)`;
+    const envelope = formatDiagnostics(raw, { toolName: 'tfsec' });
+
+    expect(envelope.status).toBe('GATE_FAILED');
+    expect(envelope.diagnostics[0].source).toBe('tfsec');
+    expect(envelope.diagnostics[0].rule_id).toBe('aws-s3-enable-bucket-encryption');
+  });
+
+  it('formats suppression hygiene violations in AISlop', () => {
+    const raw = `src/auth.ts:12:1: [AI_SLOP_UNAUTHORIZED_SUPPRESSION] Unauthorized @ts-ignore suppression comment`;
+    const envelope = formatDiagnostics(raw, { toolName: 'aislop' });
+
+    expect(envelope.status).toBe('GATE_FAILED');
+    expect(envelope.diagnostics[0].rule_id).toBe('AI_SLOP_UNAUTHORIZED_SUPPRESSION');
+    expect(envelope.diagnostics[0].repair_instruction?.action).toBe('REWRITE_BLOCK');
+  });
 });

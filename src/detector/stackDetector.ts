@@ -85,6 +85,10 @@ export class StackDetector {
       infra.dockerFiles.length +
       agentHarness.files.length;
 
+    // Universal tools check (ast-grep)
+    const hasAstGrep = this.fileExists('sgconfig.yml') || this.fileExists('.ast-grep.yml');
+    const universal = hasAstGrep ? { hasAstGrep: true } : undefined;
+
     return {
       rootPath: this.rootPath,
       jsTs,
@@ -97,6 +101,7 @@ export class StackDetector {
       ruby,
       elixir,
       infra,
+      universal,
       agentHarness,
       summary: {
         primaryStacks,
@@ -246,11 +251,19 @@ export class StackDetector {
       hasRuffConfig = true;
     }
 
+    // Check for Tach modular architecture configuration (tach.toml)
+    let hasTach = false;
+    if (this.fileExists('tach.toml') || this.fileExists('.tach.toml')) {
+      hasTach = true;
+      detectedFiles.push('tach.toml');
+    }
+
     return {
       detected: detectedFiles.length > 0,
       files: detectedFiles,
       hasPyproject,
       hasRuffConfig,
+      hasTach,
     };
   }
 
@@ -449,12 +462,40 @@ export class StackDetector {
       }
     }
 
+    // Check for Terraform / OpenTofu IaC files
+    let hasTerraform = false;
+    if (this.fileExists('main.tf') || this.fileExists('variables.tf') || this.dirExists('terraform')) {
+      hasTerraform = true;
+    } else {
+      try {
+        const rootEntries = fs.readdirSync(this.rootPath);
+        if (rootEntries.some(f => f.endsWith('.tf') || f.endsWith('.tfvars'))) {
+          hasTerraform = true;
+        }
+      } catch {}
+    }
+
+    // Check for Kubernetes / Helm manifests
+    let hasKubernetes = false;
+    if (this.dirExists('k8s') || this.dirExists('kubernetes') || this.dirExists('helm') || this.fileExists('Chart.yaml')) {
+      hasKubernetes = true;
+    } else {
+      try {
+        const rootEntries = fs.readdirSync(this.rootPath);
+        if (rootEntries.some(f => f.includes('k8s') && (f.endsWith('.yml') || f.endsWith('.yaml')))) {
+          hasKubernetes = true;
+        }
+      } catch {}
+    }
+
     return {
-      detected: workflowFiles.length > 0 || dockerFiles.length > 0,
+      detected: workflowFiles.length > 0 || dockerFiles.length > 0 || hasTerraform || hasKubernetes,
       hasWorkflows: workflowFiles.length > 0,
       workflowFiles,
       hasDocker: dockerFiles.length > 0,
       dockerFiles,
+      hasTerraform,
+      hasKubernetes,
     };
   }
 

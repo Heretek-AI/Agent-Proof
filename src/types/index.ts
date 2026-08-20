@@ -42,6 +42,8 @@ export interface StackDetectionResult {
     hasPyproject: boolean;
     /** True if Ruff configuration is defined in ruff.toml or pyproject.toml */
     hasRuffConfig: boolean;
+    /** True if Tach architecture boundary configuration (tach.toml) is present */
+    hasTach?: boolean;
   };
 
   /** Go ecosystem detection details */
@@ -114,6 +116,16 @@ export interface StackDetectionResult {
     hasDocker: boolean;
     /** List of relative paths to Docker / container definition files */
     dockerFiles: string[];
+    /** True if Terraform / OpenTofu IaC files (*.tf) are present */
+    hasTerraform?: boolean;
+    /** True if Kubernetes manifests or Helm charts are present */
+    hasKubernetes?: boolean;
+  };
+
+  /** Universal tools detection */
+  universal?: {
+    /** True if ast-grep configuration (sgconfig.yml) is present */
+    hasAstGrep?: boolean;
   };
 
   /** AI agent harness, skill definitions, and configuration files */

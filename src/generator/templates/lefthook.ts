@@ -4,7 +4,7 @@
  *
  * Implements:
  * - Stage 2: Synchronous Local Pre-Commit Hard Gates (< 2.0s execution target)
- *   Runs parallel native binaries across staged files (Biome, Ruff, AISlop, TruffleHog, Typos, Actionlint)
+ *   Runs compiled native binaries across staged files (Biome, Ruff, Tach, ast-grep, AISlop, TruffleHog, Typos, Actionlint, Zizmor, Hadolint, Tfsec, Kube-Score)
  * - Stage 3: CI & Codebase Graph Governance
  *   Runs deep analysis (Fallow, Sherif, OWASP Noir, Cargo Deny) during pre-push or CI.
  */
@@ -37,6 +37,10 @@ export function generateLefthookConfig(detection: StackDetectionResult): string 
     preCommitCommands.push(`    ruff-check:
       glob: "*.py"
       run: ruff check --staged --fix`);
+
+    preCommitCommands.push(`    tach-check:
+      glob: "*.py"
+      run: if command -v tach >/dev/null 2>&1; then tach check; fi`);
   }
 
   // Go: Fast static security analysis via gosec
@@ -88,6 +92,10 @@ export function generateLefthookConfig(detection: StackDetectionResult): string 
       run: if command -v mix >/dev/null 2>&1; then mix credo --strict {staged_files}; fi`);
   }
 
+  // Universal: Fast structural AST search and rewriting via ast-grep
+  preCommitCommands.push(`    ast-grep-scan:
+      run: if command -v sg >/dev/null 2>&1; then sg scan; elif command -v ast-grep >/dev/null 2>&1; then ast-grep scan; fi`);
+
   // Universal: Fast deterministic AI slop and swallowed error detection
   preCommitCommands.push(`    aislop-scan:
       run: if command -v aislop >/dev/null 2>&1; then aislop scan --staged; fi`);
@@ -100,11 +108,36 @@ export function generateLefthookConfig(detection: StackDetectionResult): string 
   preCommitCommands.push(`    typo-check:
       run: if command -v typos >/dev/null 2>&1; then typos --staged; fi`);
 
-  // Infra: GitHub Actions workflow syntax validation via actionlint
+  // Infra: GitHub Actions workflow syntax & security validation via actionlint & zizmor
   if (detection.infra.hasWorkflows) {
     preCommitCommands.push(`    actionlint:
       glob: ".github/workflows/*.{yml,yaml}"
       run: if command -v actionlint >/dev/null 2>&1; then actionlint; fi`);
+
+    preCommitCommands.push(`    zizmor-audit:
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: if command -v zizmor >/dev/null 2>&1; then zizmor .github/workflows; fi`);
+  }
+
+  // Infra: Docker / Container security validation via hadolint
+  if (detection.infra.hasDocker) {
+    preCommitCommands.push(`    hadolint-check:
+      glob: "{Dockerfile*,Containerfile*,docker-compose*.{yml,yaml}}"
+      run: if command -v hadolint >/dev/null 2>&1; then hadolint {staged_files}; fi`);
+  }
+
+  // Infra: Terraform / OpenTofu IaC static security analysis via tfsec
+  if (detection.infra.hasTerraform) {
+    preCommitCommands.push(`    tfsec-check:
+      glob: "*.{tf,tfvars}"
+      run: if command -v tfsec >/dev/null 2>&1; then tfsec .; fi`);
+  }
+
+  // Infra: Kubernetes static security analysis via kube-score
+  if (detection.infra.hasKubernetes) {
+    preCommitCommands.push(`    kube-score-check:
+      glob: "{k8s/**,kubernetes/**,*.k8s.{yml,yaml}}"
+      run: if command -v kube-score >/dev/null 2>&1; then kube-score score {staged_files}; fi`);
   }
 
   // =========================================================================

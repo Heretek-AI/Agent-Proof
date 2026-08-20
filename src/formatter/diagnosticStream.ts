@@ -2,9 +2,9 @@
  * @file src/formatter/diagnosticStream.ts
  * @description LSP-compliant Diagnostic Streaming Engine.
  *
- * Intercepts, deduplicates, and aggregates outputs from all governance tools
- * (AISlop, Biome, Ruff, SkillCheck, TruffleHog, Typos, Actionlint) and formats
- * them into a standardized JSON Diagnostic Envelope ($schema: https://json.schemastore.org/lsif.json).
+ * Intercepts, deduplicates, and aggregates outputs from all compiled governance tools
+ * (AISlop, Biome, Ruff, SkillCheck, TruffleHog, Typos, Actionlint, Zizmor, Hadolint, Tfsec, KubeScore, AST-Grep)
+ * and formats them into a standardized JSON Diagnostic Envelope ($schema: https://json.schemastore.org/lsif.json).
  *
  * Embeds actionable `repair_tokens` enabling autonomous LLM self-correction.
  */
@@ -17,6 +17,10 @@ import { parseSkillcheckOutput } from './parsers/skillcheck.js';
 import { parseTrufflehogOutput } from './parsers/trufflehog.js';
 import { parseTyposOutput } from './parsers/typos.js';
 import { parseActionlintOutput } from './parsers/actionlint.js';
+import { parseZizmorOutput } from './parsers/zizmor.js';
+import { parseHadolintOutput } from './parsers/hadolint.js';
+import { parseTfsecOutput, parseKubeScoreOutput } from './parsers/iac.js';
+import { parseAstGrepOutput } from './parsers/astgrep.js';
 import { parseGenericOutput } from './parsers/generic.js';
 
 /**
@@ -35,7 +39,7 @@ export interface DiagnosticStreamerOptions {
  * Raw output payload from an individual tool execution
  */
 export interface ToolExecutionResult {
-  /** Identifier of the tool (e.g. 'aislop', 'biome', 'ruff', 'trufflehog') */
+  /** Identifier of the tool (e.g. 'aislop', 'biome', 'ruff', 'zizmor') */
   toolName: string;
   /** Combined stdout and stderr string */
   output: string;
@@ -70,6 +74,21 @@ export class DiagnosticStreamer {
     }
     if (lower.includes('ruff')) {
       return parseRuffOutput(output);
+    }
+    if (lower.includes('zizmor')) {
+      return parseZizmorOutput(output);
+    }
+    if (lower.includes('hadolint')) {
+      return parseHadolintOutput(output);
+    }
+    if (lower.includes('tfsec')) {
+      return parseTfsecOutput(output);
+    }
+    if (lower.includes('kube-score') || lower.includes('kubescore')) {
+      return parseKubeScoreOutput(output);
+    }
+    if (lower.includes('ast-grep') || lower.includes('astgrep') || lower === 'sg') {
+      return parseAstGrepOutput(output);
     }
     if (lower.includes('skill') || lower.includes('skillcheck')) {
       return parseSkillcheckOutput(output);
@@ -147,11 +166,32 @@ export class DiagnosticStreamer {
 export function formatDiagnostics(
   rawOutput: string,
   options: DiagnosticStreamerOptions = {},
-  toolName?: string
+  toolName: string = 'generic'
 ): DiagnosticEnvelope {
-  const effectiveToolName = options.toolName || toolName || 'gate';
-  return DiagnosticStreamer.aggregate(
-    [{ toolName: effectiveToolName, output: rawOutput, exitCode: rawOutput.trim().length > 0 ? 1 : 0 }],
-    options
-  );
+  const effectiveTool = options.toolName || toolName;
+  const items = DiagnosticStreamer.parseToolOutput(effectiveTool, rawOutput);
+  const totalErrors = items.filter(d => d.severity === 'ERROR').length;
+  const totalWarnings = items.filter(d => d.severity === 'WARNING').length;
+
+  return {
+    $schema: 'https://json.schemastore.org/lsif.json',
+    version: '1.0.0',
+    status: totalErrors > 0 ? 'GATE_FAILED' : 'GATE_PASSED',
+    summary: {
+      total_errors: totalErrors,
+      total_warnings: totalWarnings,
+      gate_stage: options.stage || 'PreCommit',
+    },
+    diagnostics: items,
+    metadata: {
+      execution_time_ms: options.executionTimeMs,
+      tool_outputs: {
+        [effectiveTool]: {
+          exitCode: totalErrors > 0 ? 1 : 0,
+          stderr: rawOutput,
+          stdout: '',
+        },
+      },
+    },
+  };
 }
