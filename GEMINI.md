@@ -29,7 +29,7 @@ npm run typecheck
 
 ### 2. Testing & Verification
 ```bash
-# Run unit & integration test suites (11 suites, 73 tests)
+# Run unit & integration test suites (16 suites, 86 tests)
 npm test
 
 # Run real-world sandbox lifecycle test
@@ -56,24 +56,26 @@ npm run test:e2e-drop
 
 | Module | Location | Purpose |
 | :--- | :--- | :--- |
-| **Types** | [`src/types/index.ts`](file:///home/john/Projects/Agent-Proof/src/types/index.ts) | Canonical interfaces, LSP schemas, diagnostic envelopes |
-| **Detector** | [`src/detector/stackDetector.ts`](file:///home/john/Projects/Agent-Proof/src/detector/stackDetector.ts) | Multi-stack inspection across polyglot repositories (JS/TS, Py, Go, Rust, C/C++, C#, Java, Ruby, Elixir, Docker, K8s, Terraform, Tach, ast-grep) |
+| **Types** | [`src/types/index.ts`](file:///home/john/Projects/Agent-Proof/src/types/index.ts) | Canonical interfaces, LSP & SARIF schemas, diagnostic envelopes |
+| **Detector** | [`src/detector/stackDetector.ts`](file:///home/john/Projects/Agent-Proof/src/detector/stackDetector.ts) | Multi-stack inspection across polyglot repositories |
 | **Generator** | [`src/generator/configGenerator.ts`](file:///home/john/Projects/Agent-Proof/src/generator/configGenerator.ts) | Deterministic config templates (`lefthook.yml`, `.claude/hooks.json`, `biome.json`, `ruff.toml`, `.aislop/config.yml`) |
+| **ByteFence** | [`src/broker/byteFence.ts`](file:///home/john/Projects/Agent-Proof/src/broker/byteFence.ts) | Pre-write broker, preimage verification, and specification/test freezing |
+| **Sanitizer** | [`src/sanitizer/lspSanitizer.ts`](file:///home/john/Projects/Agent-Proof/src/sanitizer/lspSanitizer.ts) | Agentjacking defense & command injection scrubber |
 | **Formatter** | [`src/formatter/diagnosticStream.ts`](file:///home/john/Projects/Agent-Proof/src/formatter/diagnosticStream.ts) | ANSI stripper, tool output parsers, LSP envelope builder |
-| **Parsers** | [`src/formatter/parsers/`](file:///home/john/Projects/Agent-Proof/src/formatter/parsers/) | 11 Specialized parsers for `aislop`, `biome`, `ruff`, `skillcheck`, `trufflehog`, `typos`, `actionlint`, `zizmor`, `hadolint`, `iac`, `astgrep` |
+| **SARIF** | [`src/formatter/sarifStream.ts`](file:///home/john/Projects/Agent-Proof/src/formatter/sarifStream.ts) | OASIS SARIF v2.1.0 formatter with exact line/col replacement regions |
+| **Attestation** | [`src/attestation/provenance.ts`](file:///home/john/Projects/Agent-Proof/src/attestation/provenance.ts) | In-toto cryptographic provenance & Ed25519 signing engine |
+| **LoopBreaker** | [`src/runner/loopBreaker.ts`](file:///home/john/Projects/Agent-Proof/src/runner/loopBreaker.ts) | Failure loop tripwire preventing token and context window exhaustion |
 | **Installer** | [`src/installer/`](file:///home/john/Projects/Agent-Proof/src/installer/) | Git hook installation and read-only permission lock-in (`chmod 0444`) |
 | **Runner** | [`src/runner/gateRunner.ts`](file:///home/john/Projects/Agent-Proof/src/runner/gateRunner.ts) | Gate stage runner for `post-edit`, `pre-commit`, `pre-push` |
-| **CLI** | [`src/cli.ts`](file:///home/john/Projects/Agent-Proof/src/cli.ts) | Command dispatcher (`init`, `detect`, `run`, `lock`, `unlock`, `status`) |
-| **Launcher** | [`bin/agent-proof.js`](file:///home/john/Projects/Agent-Proof/bin/agent-proof.js) | Native binary resolution with JS fallback |
-| **Scenarios** | [`tests/ai-agent-scenarios.test.ts`](file:///home/john/Projects/Agent-Proof/tests/ai-agent-scenarios.test.ts) | 8 Complex AI agent failure-mode simulation scenarios |
-| **Polyglot Matrix** | [`scripts/test-polyglot-matrix.mjs`](file:///home/john/Projects/Agent-Proof/scripts/test-polyglot-matrix.mjs) | Real-world 5-repository GitHub integration matrix test |
+| **CLI** | [`src/cli.ts`](file:///home/john/Projects/Agent-Proof/src/cli.ts) | Command dispatcher (`init`, `detect`, `run`, `freeze`, `unfreeze`, `sanitize`, `attest`, `lock`, `unlock`, `status`) |
+| **Launcher** | [`bin/agent-proof.js`](file:///home/john/Projects/Agent-Proof/bin/agent-proof.js) | Zero-dependency binary resolution with JS fallback |
 
 ---
 
 ## 🛡️ Coding & Architectural Standards
 
-1. **Zero Runtime Dependencies**: The published CLI bundle maintains zero runtime dependencies; execution relies on standalone compiled engines.
+1. **Zero Runtime Dependencies**: The published CLI bundle maintains zero runtime dependencies; execution relies on standalone compiled engines and native Node.js crypto.
 2. **Zero-Bloat Compiled Engines**: Prefer compiled native binaries (`ast-grep`, `biome`, `ruff`, `tach`, `hadolint`, `zizmor`, `tfsec`) over heavy interpreted linters to guarantee sub-50ms latency.
 3. **Strict Suppression Hygiene**: Block unapproved suppression comments (`@ts-ignore`, `# noqa`, `biome-ignore`) across all AST checks.
 4. **Deterministic Output**: Always ensure configuration generators output formatted, deterministic strings.
-5. **Comprehensive Error Handling**: All CLI commands catch errors, format through DiagnosticStreamer, and exit cleanly with appropriate exit codes.
+5. **Comprehensive Error Handling**: All CLI commands catch errors, format through DiagnosticStreamer/SarifStreamer, and exit cleanly with appropriate exit codes.

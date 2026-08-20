@@ -11,19 +11,24 @@ Welcome to **Agent-Proof** (`@heretek-ai/agent-proof`). This document establishe
    - Governance files are intentionally locked with read-only permissions (`chmod 0444`). Do not attempt to overwrite or change their permissions unless explicitly instructed by a human administrator.
    - Never bypass git hooks with `git commit --no-verify`. All commits must pass mechanical pre-commit validation in `< 2.0s`.
 
-2. **Zero-Tolerance for AI Slop**:
+2. **Proof-Loop Role Separation & Specification Freezing**:
+   - When acting in the `Builder` role, all test suites (`tests/**`, `__tests__/**`), specifications (`spec.md`), and acceptance criteria are frozen.
+   - Modifying test assertions to force failing code to pass is strictly blocked by `ByteFence` with `SPEC_TEST_FROZEN`.
+
+3. **Zero-Tolerance for AI Slop & Unsafe Casting**:
    - **No Empty Catch Blocks / Swallowed Errors**: Always handle exceptions explicitly, log with context, rethrow with cause (`new Error(msg, { cause: err })`), or return explicit typed failure results.
    - **Strict Type Safety**: Avoid `as any` or unchecked type assertions. Use TypeScript type guards, interfaces, or validated schemas (e.g. Zod).
    - **No Hallucinated Imports**: Only import from installed packages declared in `package.json` / `pyproject.toml` or verified relative paths within the project.
    - **Clean ASTs & Formatting**: Ensure code adheres to Biome / Ruff formatting standards without lint violations or dead code.
 
-3. **Strict Suppression Hygiene Protocol**:
+4. **Strict Suppression Hygiene Protocol**:
    - Never insert blind suppression comments (`// @ts-ignore`, `// @ts-nocheck`, `# noqa`, `// biome-ignore`, `// eslint-disable`) to bypass mechanical gates.
    - Newly introduced suppression comments without documented human rationale will trigger blocking **Severity 1** failures (`AI_SLOP_UNAUTHORIZED_SUPPRESSION`).
 
-4. **Autonomous Self-Correction Protocol**:
-   - When a mechanical gate fails, parse the emitted **LSP Diagnostic Envelope** (`https://json.schemastore.org/lsif.json`).
-   - Extract the `repair_tokens` provided in `diagnostics[].repair_instruction` to apply deterministic fixes immediately rather than guessing or engaging in trial-and-error edits.
+5. **Autonomous Self-Correction Protocol**:
+   - When a mechanical gate fails, parse the emitted **LSP Diagnostic Envelope** (`https://json.schemastore.org/lsif.json`) or **SARIF v2.1.0 Log** (`https://json.schemastore.org/sarif-2.1.0.json`).
+   - Extract the `repair_tokens` or SARIF `replacements[]` provided in `diagnostics[].repair_instruction` to apply deterministic fixes immediately rather than guessing or engaging in trial-and-error edits.
+   - Respect the `LoopBreaker`: If the same defect repeats $\ge 3$ consecutive times, halt execution to prevent context exhaustion and token burning.
 
 ---
 
@@ -31,9 +36,9 @@ Welcome to **Agent-Proof** (`@heretek-ai/agent-proof`). This document establishe
 
 | Stage | Trigger Event | Latency Target | Scope | Canonical Compiled Engines |
 | :--- | :--- | :--- | :--- | :--- |
-| **Stage 1: Pre-Tool / Edit** | `PostFileEdit` agent hook | `< 50ms` | Single modified file AST | Biome (`--write`), Ruff (`--fix`), Hadolint, Zizmor, SkillCheck, ast-grep |
+| **Stage 1: Pre-Tool / Edit** | `PostFileEdit` agent hook | `< 50ms` | Single modified file AST | Biome (`--write`), Ruff (`--fix`), Hadolint, Zizmor, SkillCheck, ast-grep, LSPSanitizer |
 | **Stage 2: Hard Git Gate** | `git commit` (Pre-Commit) | `< 2.0s` | Staged blobs (`--staged`) | Lefthook parallel: Biome, Ruff, Tach, AISlop, TruffleHog, Typos, Actionlint, Zizmor, Hadolint, Tfsec, Kube-Score |
-| **Stage 3: CI & Graph Audit** | `git push` / PR Pipeline | Unconstrained | Full codebase graph | Fallow (dead code / circular deps), Sherif (monorepo), OWASP Noir (API surface), Cargo Deny |
+| **Stage 3: CI & Graph Audit** | `git push` / PR Pipeline | Unconstrained | Full codebase graph | Fallow (dead code / circular deps), Sherif (monorepo), OWASP Noir (API surface), Cargo Deny, Provenance Attestations |
 
 ---
 
@@ -47,14 +52,22 @@ Agent-Proof/
 ├── src/                        # TypeScript source code
 │   ├── detector/               # Multi-stack auto-detection engine (JS/TS, Python, Go, Rust, C/C++, C#, Java, Ruby, Elixir, Docker, Terraform, K8s)
 │   ├── generator/              # Multi-tier configuration generator & templates (Lefthook, Biome, Ruff, Claude Hooks, AISlop)
-│   ├── formatter/              # ANSI-stripper & LSP diagnostic streaming engine (LSIF schema compliant)
+│   ├── formatter/              # ANSI-stripper, SARIF v2.1.0 & LSP diagnostic streaming engine (LSIF schema compliant)
 │   │   └── parsers/            # 11 Specialized tool parsers (aislop, biome, ruff, skillcheck, trufflehog, typos, actionlint, zizmor, hadolint, iac, astgrep)
+│   ├── sanitizer/              # Agentjacking defense & diagnostic output sanitization
+│   ├── broker/                 # ByteFence transactional pre-write broker & specification freezer
+│   ├── attestation/            # In-toto cryptographic provenance & Ed25519 signing
 │   ├── installer/              # Git hook installer & POSIX permission lock-in (chmod 0444)
-│   ├── runner/                 # Mechanical gate stage execution runner
+│   ├── runner/                 # Mechanical gate stage execution runner & LoopBreaker
 │   ├── types/                  # TypeScript interfaces and schema types
 │   ├── cli.ts                  # Command-line interface dispatcher
 │   └── index.ts                # Package public API exports
-├── tests/                      # Vitest unit and integration test suites (11 suites, 73 tests)
+├── tests/                      # Vitest unit and integration test suites (16 suites, 86 tests)
+│   ├── sanitizer.test.ts       # Agentjacking defense & shell command scrubbing tests
+│   ├── bytefence.test.ts       # Preimage verification & specification freezing tests
+│   ├── sarif.test.ts           # SARIF v2.1.0 output formatting & fix region tests
+│   ├── provenance.test.ts      # In-toto Ed25519 signing & workspace tree hashing tests
+│   ├── loopbreaker.test.ts     # Failure loop breaker & tripwire tests
 │   ├── ai-agent-scenarios.test.ts # 8 Complex AI Agent failure simulation scenarios & self-correction
 │   ├── parsers.test.ts         # Exhaustive unit test suite for all 11 specialized LSP parsers
 │   ├── runner.test.ts          # Gate stage runner execution & timeout handling
@@ -88,7 +101,7 @@ Agent-Proof/
 # Build TypeScript bundles into dist/
 npm run build
 
-# Run Vitest test suites (11 suites, 73 tests)
+# Run Vitest test suites (16 suites, 86 tests)
 npm test
 
 # Run TypeScript typechecks
@@ -110,7 +123,10 @@ npm run test:e2e-drop
 node bin/agent-proof.js --help
 node bin/agent-proof.js detect
 node bin/agent-proof.js init [directory]
-node bin/agent-proof.js run pre-commit
+node bin/agent-proof.js freeze [directory]
+node bin/agent-proof.js unfreeze [directory]
+node bin/agent-proof.js attest [directory]
+node bin/agent-proof.js run pre-commit --sarif
 node bin/agent-proof.js status
 ```
 
@@ -133,6 +149,7 @@ When deploying autonomous multi-agent swarms or delegating tasks, adhere to the 
   - Prohibit hardcoded high-entropy API tokens, private keys, or credentials (`TruffleHog`).
   - Audit GitHub Actions workflows for expression injection and unpinned actions (`zizmor`, `actionlint`).
   - Validate Dockerfiles and Kubernetes manifests (`hadolint`, `kube-score`, `tfsec`).
+  - Enforce `LSPSanitizer` on all external observability logs to prevent Agentjacking.
 
 ### 3. Performance & Memory Optimizer (`performance-optimizer`)
 - **Mission**: Prevent algorithmic bottlenecks, memory leaks, and blocking operations.
@@ -142,7 +159,7 @@ When deploying autonomous multi-agent swarms or delegating tasks, adhere to the 
   - Utilize zero-bloat compiled binaries to maintain sub-50ms editor feedback loops.
 
 ### 4. Test & Verification Engineer (`test-engineer`)
-- **Mission**: Author comprehensive, deterministic unit and integration tests.
+- **Mission**: Author comprehensive, deterministic unit and integration tests under specification freeze.
 - **Rules**:
   - Every new feature or parser must include unit tests with 100% path coverage.
   - Never author non-deterministic tests that depend on unpinned network calls or timers.

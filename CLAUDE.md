@@ -10,7 +10,7 @@ This guide provides instructions and reference material for **Claude Code** sess
 # Build the project (tsup bundles to dist/)
 npm run build
 
-# Run unit and integration tests (Vitest, 11 suites, 73 tests)
+# Run unit and integration tests (Vitest, 16 suites, 86 tests)
 npm test
 
 # Run strict TypeScript type checks
@@ -32,6 +32,10 @@ npm run test:e2e-drop
 node bin/agent-proof.js --version
 node bin/agent-proof.js init
 node bin/agent-proof.js detect
+node bin/agent-proof.js freeze
+node bin/agent-proof.js unfreeze
+node bin/agent-proof.js attest
+node bin/agent-proof.js run pre-commit --sarif
 node bin/agent-proof.js status
 ```
 
@@ -45,14 +49,18 @@ Agent-Proof is structured into modular components:
    - Inspects target repository indicators (JS/TS, Python, Go, Rust, C/C++, C#, Java, Ruby, Elixir, GitHub Workflows, Docker, Terraform, Kubernetes, Claude Agent Harness, Tach, AST-Grep).
 2. **Config Generator (`src/generator/configGenerator.ts`)**:
    - Generates `lefthook.yml`, `.claude/hooks.json`, `biome.json`, `ruff.toml`, and `.aislop/config.yml`.
-3. **Diagnostic Streamer (`src/formatter/diagnosticStream.ts`)**:
-   - Converts raw stderr/stdout from 11 tools (`aislop`, `biome`, `ruff`, `skillcheck`, `trufflehog`, `typos`, `actionlint`, `zizmor`, `hadolint`, `tfsec`, `kube-score`, `astgrep`) into an LSP-compliant JSON diagnostic envelope with `repair_tokens`.
-4. **Hook Installer & Lock-in (`src/installer/`)**:
+3. **ByteFence Pre-Write Broker & Spec Freezer (`src/broker/byteFence.ts`)**:
+   - Mediates atomic file writes, validates preimage SHA-256 digests, and freezes test directories against Builder modifications (`SPEC_TEST_FROZEN`).
+4. **LSPSanitizer (`src/sanitizer/lspSanitizer.ts`)**:
+   - Scrubs shell command injections (`curl | sh`, `npx`, `sudo`) from external logs and MCP outputs (Agentjacking defense).
+5. **Diagnostic & SARIF Streamer (`src/formatter/`)**:
+   - Converts raw stderr/stdout from 11 tools into standard LSP envelopes or SARIF v2.1.0 logs with exact replacement fix regions.
+6. **Provenance Engine (`src/attestation/provenance.ts`)**:
+   - Signs in-toto attestation receipts using ephemeral Ed25519 keypairs.
+7. **Loop Breaker (`src/runner/loopBreaker.ts`)**:
+   - Tripwires a hard halt after $\ge 3$ consecutive identical failure iterations.
+8. **Hook Installer & Lock-in (`src/installer/`)**:
    - Sets up `.git/hooks/pre-commit` and locks governance files to read-only (`chmod 0444`).
-5. **Gate Runner (`src/runner/gateRunner.ts`)**:
-   - Executes gate stages (`post-edit`, `pre-commit`, `pre-push`).
-6. **Binary Launchers (`bin/agent-proof.js` & `bin/agent-gate.js`)**:
-   - Zero-dependency node wrappers that delegate execution directly to native architecture binaries or fall back to `dist/cli.js`.
 
 ---
 
@@ -71,7 +79,7 @@ When Claude Code operates in a repository initialized with Agent-Proof:
 
 2. **Pre-Commit Hard Gate**:
    - Intercepts `git commit` and runs parallel compiled linters via Lefthook in **`< 2.0s`**.
-   - If any violation occurs, a non-zero exit code blocks the commit and provides an LSP diagnostic envelope.
+   - If any violation occurs, a non-zero exit code blocks the commit and provides an LSP diagnostic envelope or SARIF log.
 
 3. **Strict Suppression Hygiene**:
    - Blind suppression directives (`// @ts-ignore`, `// biome-ignore`, `# noqa`) trigger **Severity 1** failures.

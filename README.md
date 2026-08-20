@@ -1,6 +1,6 @@
 # @heretek-ai/agent-proof 🔒
 
-> **Zero-Bloat Mechanical Hard-Gate CLI for Autonomous AI Coding Agents** — Deterministic multi-tier code governance, sub-50ms post-edit interceptors, sub-2.0s pre-commit hard gates, strict suppression hygiene, and LSP diagnostic envelopes with repair tokens for Claude Code, Antigravity, Cursor, Codex, and Aider.
+> **Zero-Bloat Deterministic Mechanical Hard-Gate CLI for Autonomous AI Coding Agents** — Multi-tier zero-trust code governance, ByteFence transactional pre-write broker & specification freezer, LSPSanitizer Agentjacking defense, sub-50ms post-edit interceptors, sub-2.0s pre-commit hard gates, strict suppression hygiene, SARIF v2.1.0 exact repair tokens, and in-toto Ed25519 cryptographic provenance for Claude Code, Antigravity, Cursor, Codex, and Aider.
 
 [![npm version](https://img.shields.io/npm/v/@heretek-ai/agent-proof.svg?style=flat-square&color=blue)](https://www.npmjs.com/package/@heretek-ai/agent-proof)
 [![CI Test Suite](https://github.com/Heretek-AI/Agent-Proof/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/Heretek-AI/Agent-Proof/actions/workflows/ci.yml)
@@ -15,15 +15,74 @@
 
 ## 🎯 Executive Overview
 
-Prompt-based guardrails (`CLAUDE.md`, `.cursorrules`, `rules.md`, system prompts) inevitably degrade under context saturation and complex multi-file refactoring tasks. When autonomous AI coding agents make rapid edits, they frequently introduce **AI Slop**:
+Prompt-based guardrails (`CLAUDE.md`, `.cursorrules`, `rules.md`, system prompts) inevitably degrade under context saturation and complex multi-file refactoring tasks. When autonomous AI coding agents make rapid edits, they frequently introduce **AI Slop** and encounter security attack vectors:
 - **Swallowed Errors & Empty Catch Blocks**: `try { ... } catch (e) {}` or `except: pass` that mask critical outages.
 - **Strict Suppression Bypass**: Blindly inserting `// @ts-ignore`, `// biome-ignore`, or `# noqa` to bypass checks without fixing underlying bugs.
 - **Unsafe Type Casting**: Pervasive `as any` or unchecked type assertions that erode type safety.
 - **Hallucinated Dependencies**: Imports from packages not declared in `package.json` or `pyproject.toml`.
-- **Architectural Drift & Circular Imports**: Breaking modular isolation boundaries and leaking domain abstractions.
-- **Governance Tampering**: Agents weakening or modifying linter configs (`biome.json`, `ruff.toml`, `lefthook.yml`) to pass commits.
+- **Test Suite Tampering**: Agents altering unit test assertions or softening `spec.md` acceptance criteria to force broken code to pass.
+- **Agentjacking & Second-Order Prompt Injection**: Attackers injecting executable shell commands (`curl | sh`, `npx`) into public Sentry logs or MCP tool results that trick the agent into executing arbitrary host commands.
+- **Token Thrashing & Infinite Failure Loops**: Agents entering cyclic trial-and-error repair loops that exhaust developer budgets and context windows.
 
-**Agent-Proof** replaces soft prompt instructions with **deterministic, zero-bloat mechanical hard gates**: standalone compiled native binaries (Rust, Go) and lifecycle interceptors that physically prevent non-compliant code from reaching version control.
+**Agent-Proof** replaces soft prompt instructions with **deterministic, zero-bloat mechanical hard gates**: standalone compiled native binaries (Rust, Go), ByteFence transactional pre-write write brokers, and cryptographic in-toto provenance that physically prevent non-compliant code from reaching version control.
+
+---
+
+## ⚡ Zero-Trust Architecture & Mechanical Governance Pipeline
+
+```mermaid
+flowchart TD
+    subgraph Agent Mutation Pipeline
+        A[AI Agent Edit Request] --> B[ByteFence Pre-Write Broker]
+        B -->|Check Frozen Paths| C{Is spec/test file frozen in Builder mode?}
+        C -->|Yes| D[Block Mutation: SPEC_TEST_FROZEN]
+        C -->|No| E[Validate Preimage SHA-256]
+        E -->|Mismatch| F[Block Mutation: PREIMAGE_MISMATCH]
+        E -->|Match| G[Atomic Write via Temp File + Rename]
+    end
+
+    subgraph Mechanical Gate & Diagnostic Defense
+        G --> H[Stage 1 & 2 Linters / AST Checks]
+        H -->|Tool Errors| I[LSPSanitizer: Agentjacking Defense]
+        I -->|Scrub Shell Injections & Flatten Markdown| J[SARIF v2.1.0 / LSP Formatter with Exact Fix Regions]
+        J --> K[Failure Loop Breaker: Threshold Check]
+        K -->|Repeat Defect >= 3| L[Hard Tripwire: FAILURE_LOOP_HALT]
+        K -->|Under Threshold| M[Emit Structured Diagnostic Envelope to Agent]
+    end
+
+    subgraph Provenance Fabric
+        H -->|All Checks Pass| N[Provenance Attestation Engine]
+        N -->|Compute Git Tree SHA-256| O[Sign in-toto Receipt via Ephemeral Ed25519]
+        O --> P[Emit Cryptographic ActionProof Receipt]
+    end
+```
+
+---
+
+## 🛡️ Zero-Trust Hardening Modules
+
+### 1. `ByteFence` Transactional Pre-Write Broker & Specification Freezer
+- **Preimage Validation**: Computes `sha256(currentBytes)` and validates equality before allowing byte replacements, preventing out-of-order race conditions.
+- **Proof-Loop Role Separation & Test Freezing**: Automatically freezes `tests/**`, `__tests__/**`, `spec.md`, and governance configs. Hard-blocks writes with `SPEC_TEST_FROZEN` whenever an agent operating in `Builder` role attempts to alter test assertions.
+- **Atomic POSIX Writes**: Writes candidate bytes to a temporary same-directory file and executes `fs.renameSync` to eliminate partial write corruptions.
+- **Cryptographic Receipts**: Emits `MEDIATED_PROVEN` receipts with candidate digests and ISO timestamps.
+
+### 2. `LSPSanitizer` Agentjacking Defense & Log Sanitization
+- **Second-Order Injection Scrubbing**: Neutralizes malicious shell command injections (`curl | sh`, `wget ...`, `npx --yes`, `sudo`, `eval`, `rm -rf`) in external logs, Sentry error streams, or MCP tool results.
+- **Executable Code Block Stripping**: Flattens triple-backtick markdown blocks to prevent auto-execution.
+- **Passive Evidence Framing**: Wraps error outputs in a rigid `[PASSIVE_EVIDENCE_BOUNDARY]` data contract so LLMs treat diagnostic output strictly as static evidence rather than executable instructions.
+
+### 3. `SarifStreamer` SARIF v2.1.0 Exact Replacement Formatter
+- Implements official OASIS SARIF v2.1.0 schema ([`https://json.schemastore.org/sarif-2.1.0.json`](https://json.schemastore.org/sarif-2.1.0.json)).
+- Generates `runs[].results[].fixes[].artifactChanges[].replacements[]` with exact 1-indexed `deletedRegion` line/col coordinates and `insertedContent` replacement tokens, accelerating agent repair convergence.
+
+### 4. `ProvenanceEngine` In-Toto Attestations & Ephemeral Ed25519 Signatures
+- Computes deterministic SHA-256 root digest of repository source files.
+- Generates and cryptographically signs in-toto attestation statements using ephemeral Ed25519 keypairs via native `node:crypto`.
+- Provides verification via `ProvenanceEngine.verifyAttestation(statement)`.
+
+### 5. `LoopBreaker` Context & Budget Protector
+- Monitors defect repetition across iterations and tripwires a hard halt (`FAILURE_LOOP_TRIPPED`) after $\ge 3$ consecutive identical failures to stop token thrashing.
 
 ---
 
@@ -48,23 +107,7 @@ Traditional verification frameworks rely on heavy interpreted runtimes (Python v
 
 ---
 
-## 🏗️ 3-Tier Execution Architecture
-
-```mermaid
-flowchart TD
-    A[AI Coding Agent / Developer] -->|File Modification| B[Stage 1: Agent Tool Interceptor]
-    B -->|sub-50ms single AST| C{Biome / Ruff / hadolint / zizmor / ast-grep}
-    C -->|Failure| D[LSP Diagnostic Streamer\nLSIF Envelope + Repair Tokens]
-    D -->|Autonomous Self-Correction| A
-    C -->|Success| E[Git Staging Area]
-    E -->|git commit| F[Stage 2: Pre-Commit Hard Gate]
-    F -->|sub-2.0s parallel native| G[Lefthook Parallel Runner\nBiome + Ruff + Tach + AISlop + TruffleHog + Typos + Actionlint + Zizmor + Hadolint + Tfsec]
-    G -->|Commit Passed| H[Git Working Tree]
-    H -->|git push / CI| I[Stage 3: CI & Codebase Graph Governance]
-    I -->|Full Graph Analysis| J[Fallow Audit + Sherif + OWASP Noir + Cargo Deny]
-```
-
-### Execution Stage SLA Matrix
+## 🏗️ 3-Tier Execution Stage SLA Matrix
 
 | Stage | Trigger Event | Latency Target | Scope | Canonical Engines |
 | :--- | :--- | :--- | :--- | :--- |
@@ -76,7 +119,7 @@ flowchart TD
 
 ## 🤖 Complex AI Agent Task Scenarios & Autonomous Self-Correction
 
-Agent-Proof includes automated test scenarios that explicitly simulate complex real-world tasks where autonomous agents frequently fail, intercepting anti-patterns and emitting actionable `repair_tokens`:
+Agent-Proof includes automated test scenarios simulating complex real-world tasks where autonomous agents frequently fail, intercepting anti-patterns and emitting actionable `repair_tokens`:
 
 | Scenario | Complex Task Assigned | Agent Anti-Pattern Injected | Gate Interceptor | Actionable `repair_tokens` |
 | :--- | :--- | :--- | :--- | :--- |
@@ -116,31 +159,6 @@ Agent-Proof is continuously verified across real-world open-source repositories 
 
 ---
 
-## 🛡️ Strict Suppression Hygiene Gate
-
-Agents frequently attempt to bypass mechanical gates by inserting blind suppression comments (`// @ts-ignore`, `// biome-ignore`, `# noqa`, `// eslint-disable`).
-
-Agent-Proof's **Suppression Hygiene Gate** treats newly inserted unapproved suppression markers as blocking **Severity 1** violations:
-
-```json
-{
-  "source": "aislop",
-  "rule_id": "AI_SLOP_UNAUTHORIZED_SUPPRESSION",
-  "severity": "ERROR",
-  "file_path": "src/auth.ts",
-  "error_message": "Unauthorized @ts-ignore suppression comment inserted to bypass type checking.",
-  "repair_instruction": {
-    "action": "REWRITE_BLOCK",
-    "description": "Remove unauthorized suppression comment. Fix the underlying type or lint issue rather than bypassing governance.",
-    "repair_tokens": [
-      "// Remove suppression comment and fix root cause with type guards or explicit handling"
-    ]
-  }
-}
-```
-
----
-
 ## 🚀 Quick Start
 
 Initialize mechanical hard gates in any repository with zero configuration:
@@ -174,8 +192,18 @@ agent-proof run post-edit <filePath>   # Stage 1: PostFileEdit hook (< 50ms)
 agent-proof run pre-commit            # Stage 2: Staged files hard gate (< 2.0s)
 agent-proof run pre-push              # Stage 3: Full codebase graph audit
 
-# Stream and format raw tool stderr into LSP Diagnostic Envelope
-cat tool_output.log | agent-proof format-diagnostics --tool aislop
+# Freeze test suites & specifications against Builder modifications (Proof-Loop)
+agent-proof freeze [directory]
+agent-proof unfreeze [directory]
+
+# Sanitize raw log or MCP tool streams to neutralize Agentjacking payloads
+agent-proof sanitize [file]
+
+# Generate in-toto Ed25519 cryptographic provenance attestation receipt
+agent-proof attest [directory]
+
+# Stream and format raw tool stderr into LSP or SARIF Diagnostic Envelope
+cat tool_output.log | agent-proof format-diagnostics --tool aislop --sarif
 
 # Manage immutable governance permissions
 agent-proof status                    # Inspect locked status (chmod 0444)
@@ -204,46 +232,6 @@ Agent-Proof automatically inspects polyglot repositories and configures appropri
 | **Terraform / IaC** | `*.tf`, `*.tfvars`, `terraform/` | Tfsec (cloud security static analysis) |
 | **Kubernetes** | `k8s/`, `kubernetes/`, `helm/`, `*.k8s.yml` | Kube-Score (pod security context analysis) |
 | **AI Agent Harnesses** | `.claude/`, `CLAUDE.md`, `.cursor/`, `SKILL.md` | Claude Hooks + SkillCheck + Permission Lock-in |
-
----
-
-## 📡 LSP Diagnostic Envelopes & Autonomous Auto-Repair
-
-When any mechanical gate fails, Agent-Proof strips ANSI terminal codes and formats the error stream into a standard **LSP Diagnostic Envelope** ([`https://json.schemastore.org/lsif.json`](https://json.schemastore.org/lsif.json)):
-
-```json
-{
-  "$schema": "https://json.schemastore.org/lsif.json",
-  "version": "1.0.0",
-  "status": "GATE_FAILED",
-  "summary": {
-    "total_errors": 1,
-    "total_warnings": 0,
-    "gate_stage": "PreCommit"
-  },
-  "diagnostics": [
-    {
-      "source": "aislop",
-      "rule_id": "AI_SLOP_SWALLOWED_ERROR",
-      "severity": "ERROR",
-      "file_path": "src/auth/session.ts",
-      "range": {
-        "start": { "line": 42, "column": 5 },
-        "end": { "line": 44, "column": 6 }
-      },
-      "error_message": "Empty catch block silently swallows authentication failure.",
-      "repair_instruction": {
-        "action": "REWRITE_BLOCK",
-        "description": "Handle the exception explicitly. Either log the error, rethrow a custom Error, or return an explicit failure response.",
-        "repair_tokens": [
-          "import { AppError } from '../errors';",
-          "throw new AppError('Operation failed', { cause: error });"
-        ]
-      }
-    }
-  ]
-}
-```
 
 ---
 
