@@ -127,6 +127,15 @@ function detectRuleFromMessage(msg: string = ''): string {
   if (m.includes('catch') || m.includes('swallow') || m.includes('silent')) {
     return 'AI_SLOP_SWALLOWED_ERROR';
   }
+  if (m.includes('yaml') || m.includes('safeloader')) {
+    return 'AI_SLOP_UNSAFE_YAML_LOAD';
+  }
+  if (m.includes('popen') || m.includes('spawn')) {
+    return 'AI_SLOP_DEPRECATED_PROCESS_SPAWN';
+  }
+  if (m.includes('todo!') || m.includes('panic')) {
+    return 'AI_SLOP_PRODUCTION_PANIC';
+  }
   if (m.includes('cast') || m.includes('any')) {
     return 'AI_SLOP_UNSAFE_CAST';
   }
@@ -152,6 +161,32 @@ function generateAislopRepair(ruleId: string = '', snippet?: string): Diagnostic
         "import { AppError } from '../errors';",
         "throw new AppError('Operation failed', { cause: error });",
       ],
+    };
+  }
+
+  if (r.includes('YAML') || r.includes('SAFE_LOAD')) {
+    return {
+      action: 'REPLACE_TOKEN',
+      description: 'Replace unsafe yaml.load() with yaml.safe_load() to prevent arbitrary code execution.',
+      repair_tokens: ['yaml.safe_load(data)'],
+    };
+  }
+
+  if (r.includes('POPEN') || r.includes('PROCESS')) {
+    return {
+      action: 'REWRITE_BLOCK',
+      description: 'Replace deprecated os.popen() with subprocess.run() specifying timeouts and captured output.',
+      repair_tokens: [
+        'subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)',
+      ],
+    };
+  }
+
+  if (r.includes('TODO') || r.includes('PANIC')) {
+    return {
+      action: 'REWRITE_BLOCK',
+      description: 'Implement the function body or return an explicit Result/Error instead of panic macro todo!().',
+      repair_tokens: ['// Implement function or return Err(AppError::NotImplemented)'],
     };
   }
 

@@ -169,4 +169,24 @@ members = ["crates/*"]
       'Agent Harness',
     ]);
   });
+
+  it('detects C/C++, C#, Java, Ruby, and Elixir ecosystems', () => {
+    fs.writeFileSync(path.join(tempDir, 'CMakeLists.txt'), 'cmake_minimum_required(VERSION 3.10)');
+    fs.writeFileSync(path.join(tempDir, 'App.csproj'), '<Project Sdk="Microsoft.NET.Sdk">');
+    fs.writeFileSync(path.join(tempDir, 'pom.xml'), '<project></project>');
+    fs.writeFileSync(path.join(tempDir, 'Gemfile'), 'source "https://rubygems.org"');
+    fs.writeFileSync(path.join(tempDir, 'mix.exs'), 'defmodule App.MixProject do');
+
+    const result = detectStack(tempDir);
+    expect(result.cpp?.detected).toBe(true);
+    expect(result.csharp?.detected).toBe(true);
+    expect(result.java?.detected).toBe(true);
+    expect(result.ruby?.detected).toBe(true);
+    expect(result.elixir?.detected).toBe(true);
+    expect(result.summary.primaryStacks).toContain('C/C++');
+    expect(result.summary.primaryStacks).toContain('C#/.NET');
+    expect(result.summary.primaryStacks).toContain('Java');
+    expect(result.summary.primaryStacks).toContain('Ruby');
+    expect(result.summary.primaryStacks).toContain('Elixir');
+  });
 });

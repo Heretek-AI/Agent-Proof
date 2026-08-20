@@ -53,6 +53,41 @@ export function generateLefthookConfig(detection: StackDetectionResult): string 
       run: cargo deny check`);
   }
 
+  // C/C++: clang-format / clang-tidy on staged files
+  if (detection.cpp?.detected) {
+    preCommitCommands.push(`    cpp-check:
+      glob: "*.{c,cpp,h,hpp,cc,cxx}"
+      run: clang-format --dry-run --Werror {staged_files}`);
+  }
+
+  // C# / .NET: dotnet format check
+  if (detection.csharp?.detected) {
+    preCommitCommands.push(`    dotnet-format:
+      glob: "*.{cs,fs}"
+      run: dotnet format --verify-no-changes`);
+  }
+
+  // Java: checkstyle / spotbugs check
+  if (detection.java?.detected) {
+    preCommitCommands.push(`    java-check:
+      glob: "*.java"
+      run: if command -v checkstyle >/dev/null 2>&1; then checkstyle {staged_files}; fi`);
+  }
+
+  // Ruby: rubocop check
+  if (detection.ruby?.detected) {
+    preCommitCommands.push(`    rubocop-check:
+      glob: "*.rb"
+      run: if command -v rubocop >/dev/null 2>&1; then rubocop --force-exclusion {staged_files}; fi`);
+  }
+
+  // Elixir: mix credo check
+  if (detection.elixir?.detected) {
+    preCommitCommands.push(`    credo-check:
+      glob: "*.{ex,exs}"
+      run: if command -v mix >/dev/null 2>&1; then mix credo --strict {staged_files}; fi`);
+  }
+
   // Universal: Fast deterministic AI slop and swallowed error detection
   preCommitCommands.push(`    aislop-scan:
       run: npx aislop scan --staged --fail-on 50`);

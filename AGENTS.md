@@ -93,6 +93,40 @@ node bin/agent-proof.js status
 
 ---
 
+## 🤖 Specialized Autonomous Sub-Agent Roles
+
+When deploying autonomous multi-agent swarms or delegating tasks, adhere to the following specialized sub-agent role specifications:
+
+### 1. Architecture Auditor (`architecture-auditor`)
+- **Mission**: Enforce modular separation of concerns, layer isolation, and prevent cyclic dependency drift.
+- **Rules**:
+  - Domain / core logic must never import transport, UI, or external adapter layers.
+  - Intercept tight coupling between independent modules before code is staged.
+  - Verify package boundaries in monorepo structures.
+
+### 2. Security & Secret Reviewer (`security-reviewer`)
+- **Mission**: Block credential leaks, injection vectors, and unauthorized privilege escalation.
+- **Rules**:
+  - Prohibit hardcoded high-entropy API tokens, private keys, or credentials.
+  - Validate all external inputs with schema parsers (e.g. Zod) before processing.
+  - Enforce OWASP API security boundaries and check for path traversal vulnerabilities.
+
+### 3. Performance & Memory Optimizer (`performance-optimizer`)
+- **Mission**: Prevent algorithmic bottlenecks, memory leaks, and blocking operations.
+- **Rules**:
+  - Eliminate synchronous blocking I/O on hot execution paths.
+  - Ensure unhandled Promise rejections and dangling event listeners are remediated.
+  - Optimize AST traversals and file operations using streams and file descriptors.
+
+### 4. Test & Verification Engineer (`test-engineer`)
+- **Mission**: Author comprehensive, deterministic unit and integration tests.
+- **Rules**:
+  - Every new feature or parser must include unit tests with 100% path coverage.
+  - Never author non-deterministic tests that depend on network calls or unpinned timers.
+  - Validate failure branches and verify that repair tokens produce clean, passing builds.
+
+---
+
 ## 🔒 Security & Supply Chain Standards
 
 - **NPM Package**: `@heretek-ai/agent-proof` published to `https://registry.npmjs.org/@heretek-ai/agent-proof`.

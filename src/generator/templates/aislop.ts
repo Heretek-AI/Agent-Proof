@@ -1,11 +1,19 @@
 /**
  * @file src/generator/templates/aislop.ts
  * @description Generates the .aislop/config.yml configuration for deterministic AI slop detection.
+ *
+ * Enforces zero-tolerance rules for AI code smells:
+ * - Swallowed errors and empty catch blocks
+ * - Unsafe type casts (as any)
+ * - Hallucinated imports
+ * - Insecure YAML deserialization (yaml.load without SafeLoader)
+ * - Deprecated process execution (os.popen)
+ * - Production panic macros (todo!() in Rust)
  */
 
 /**
  * Generate an AISlop configuration defining deterministic rules against
- * swallowed errors, empty catch blocks, hallucinated imports, and unsafe type casts.
+ * swallowed errors, empty catch blocks, hallucinated imports, and unsafe patterns.
  *
  * @returns Formatted YAML string for .aislop/config.yml
  */
@@ -31,6 +39,24 @@ rules:
   hallucinated_imports:
     severity: error
     fail_score: 40
+    enabled: true
+
+  # Insecure YAML loading without SafeLoader
+  unsafe_yaml_load:
+    severity: error
+    fail_score: 35
+    enabled: true
+
+  # Deprecated process execution (e.g. os.popen)
+  deprecated_process_spawn:
+    severity: warning
+    fail_score: 20
+    enabled: true
+
+  # Production runtime panic macros (e.g. todo!() in Rust)
+  production_panic_macros:
+    severity: error
+    fail_score: 50
     enabled: true
 
   # Dead code / unused functions created by LLMs

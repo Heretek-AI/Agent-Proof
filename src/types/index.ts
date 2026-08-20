@@ -62,6 +62,46 @@ export interface StackDetectionResult {
     isWorkspace: boolean;
   };
 
+  /** C/C++ ecosystem detection details */
+  cpp?: {
+    /** True if C/C++ build manifests (CMakeLists.txt, Makefile, compile_commands.json) were found */
+    detected: boolean;
+    /** List of relative file paths that triggered C/C++ detection */
+    files: string[];
+  };
+
+  /** C# / .NET ecosystem detection details */
+  csharp?: {
+    /** True if .NET project or solution files (*.csproj, *.sln, global.json) were found */
+    detected: boolean;
+    /** List of relative file paths that triggered C# detection */
+    files: string[];
+  };
+
+  /** Java ecosystem detection details */
+  java?: {
+    /** True if Java build manifests (pom.xml, build.gradle, settings.gradle) were found */
+    detected: boolean;
+    /** List of relative file paths that triggered Java detection */
+    files: string[];
+  };
+
+  /** Ruby ecosystem detection details */
+  ruby?: {
+    /** True if Ruby manifests (Gemfile, .rubocop.yml, Rakefile) were found */
+    detected: boolean;
+    /** List of relative file paths that triggered Ruby detection */
+    files: string[];
+  };
+
+  /** Elixir ecosystem detection details */
+  elixir?: {
+    /** True if Elixir project manifests (mix.exs) were found */
+    detected: boolean;
+    /** List of relative file paths that triggered Elixir detection */
+    files: string[];
+  };
+
   /** Infrastructure, CI workflows, and containerization detection */
   infra: {
     /** True if CI workflow files or Docker containers were detected */

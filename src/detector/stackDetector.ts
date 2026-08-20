@@ -48,6 +48,11 @@ export class StackDetector {
     const python = this.detectPython();
     const go = this.detectGo();
     const rust = this.detectRust();
+    const cpp = this.detectCpp();
+    const csharp = this.detectCsharp();
+    const java = this.detectJava();
+    const ruby = this.detectRuby();
+    const elixir = this.detectElixir();
     const infra = this.detectInfra();
     const agentHarness = this.detectAgentHarness();
 
@@ -57,6 +62,11 @@ export class StackDetector {
     if (python.detected) primaryStacks.push('Python');
     if (go.detected) primaryStacks.push('Go');
     if (rust.detected) primaryStacks.push('Rust');
+    if (cpp.detected) primaryStacks.push('C/C++');
+    if (csharp.detected) primaryStacks.push('C#/.NET');
+    if (java.detected) primaryStacks.push('Java');
+    if (ruby.detected) primaryStacks.push('Ruby');
+    if (elixir.detected) primaryStacks.push('Elixir');
     if (infra.detected) primaryStacks.push('Workflows/Infra');
     if (agentHarness.detected) primaryStacks.push('Agent Harness');
 
@@ -66,6 +76,11 @@ export class StackDetector {
       python.files.length +
       go.files.length +
       rust.files.length +
+      cpp.files.length +
+      csharp.files.length +
+      java.files.length +
+      ruby.files.length +
+      elixir.files.length +
       infra.workflowFiles.length +
       infra.dockerFiles.length +
       agentHarness.files.length;
@@ -76,6 +91,11 @@ export class StackDetector {
       python,
       go,
       rust,
+      cpp,
+      csharp,
+      java,
+      ruby,
+      elixir,
       infra,
       agentHarness,
       summary: {
@@ -283,6 +303,110 @@ export class StackDetector {
       detected: detectedFiles.length > 0,
       files: detectedFiles,
       isWorkspace,
+    };
+  }
+
+  /**
+   * Detect C/C++ ecosystem indicators (CMakeLists.txt, Makefile, compile_commands.json, conanfile.txt).
+   */
+  private detectCpp() {
+    const indicators = ['CMakeLists.txt', 'Makefile', 'compile_commands.json', 'conanfile.txt', 'vcpkg.json'];
+    const detectedFiles: string[] = [];
+
+    for (const indicator of indicators) {
+      if (this.fileExists(indicator)) {
+        detectedFiles.push(indicator);
+      }
+    }
+
+    return {
+      detected: detectedFiles.length > 0,
+      files: detectedFiles,
+    };
+  }
+
+  /**
+   * Detect C# / .NET ecosystem indicators (*.csproj, *.sln, global.json, Directory.Build.props).
+   */
+  private detectCsharp() {
+    const indicators = ['global.json', 'Directory.Build.props', 'Directory.Build.targets'];
+    const detectedFiles: string[] = [];
+
+    for (const indicator of indicators) {
+      if (this.fileExists(indicator)) {
+        detectedFiles.push(indicator);
+      }
+    }
+
+    try {
+      const files = fs.readdirSync(this.rootPath);
+      for (const f of files) {
+        if (f.endsWith('.sln') || f.endsWith('.csproj') || f.endsWith('.fsproj')) {
+          detectedFiles.push(f);
+        }
+      }
+    } catch {}
+
+    return {
+      detected: detectedFiles.length > 0,
+      files: detectedFiles,
+    };
+  }
+
+  /**
+   * Detect Java ecosystem indicators (pom.xml, build.gradle, settings.gradle, gradlew).
+   */
+  private detectJava() {
+    const indicators = ['pom.xml', 'build.gradle', 'build.gradle.kts', 'settings.gradle', 'settings.gradle.kts', 'gradlew'];
+    const detectedFiles: string[] = [];
+
+    for (const indicator of indicators) {
+      if (this.fileExists(indicator)) {
+        detectedFiles.push(indicator);
+      }
+    }
+
+    return {
+      detected: detectedFiles.length > 0,
+      files: detectedFiles,
+    };
+  }
+
+  /**
+   * Detect Ruby ecosystem indicators (Gemfile, Gemfile.lock, .rubocop.yml, Rakefile).
+   */
+  private detectRuby() {
+    const indicators = ['Gemfile', 'Gemfile.lock', '.rubocop.yml', 'Rakefile'];
+    const detectedFiles: string[] = [];
+
+    for (const indicator of indicators) {
+      if (this.fileExists(indicator)) {
+        detectedFiles.push(indicator);
+      }
+    }
+
+    return {
+      detected: detectedFiles.length > 0,
+      files: detectedFiles,
+    };
+  }
+
+  /**
+   * Detect Elixir ecosystem indicators (mix.exs, mix.lock).
+   */
+  private detectElixir() {
+    const indicators = ['mix.exs', 'mix.lock'];
+    const detectedFiles: string[] = [];
+
+    for (const indicator of indicators) {
+      if (this.fileExists(indicator)) {
+        detectedFiles.push(indicator);
+      }
+    }
+
+    return {
+      detected: detectedFiles.length > 0,
+      files: detectedFiles,
     };
   }
 
