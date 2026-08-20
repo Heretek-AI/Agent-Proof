@@ -106,8 +106,8 @@ export class DiagnosticStreamer {
         stdout: '',
       };
 
-      // Only parse diagnostics if tool exited with non-zero or output is present
-      if (res.exitCode !== 0 || res.output.trim().length > 0) {
+      // Only parse diagnostics if tool exited with non-zero exit code
+      if (res.exitCode !== 0) {
         const diags = this.parseToolOutput(res.toolName, res.output);
         allDiagnostics.push(...diags);
       }

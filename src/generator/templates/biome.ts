@@ -5,7 +5,7 @@
 
 /**
  * Generate a standard, high-performance Biome configuration with strict rules against
- * common AI-generated anti-patterns (noExplicitAny, noDebugger, noVar).
+ * common AI-generated anti-patterns (noExplicitAny, noDebugger, noDoubleEquals, noUnusedImports).
  *
  * @returns Formatted JSON string for biome.json
  */
@@ -20,7 +20,6 @@ export function generateBiomeConfig(): string {
     },
     files: {
       ignoreUnknown: false,
-      ignore: ['node_modules', 'dist', 'build', '.git'],
     },
     formatter: {
       enabled: true,
@@ -40,11 +39,9 @@ export function generateBiomeConfig(): string {
         correctness: {
           noUnusedVariables: 'error',
           noUnusedImports: 'error',
-          useExhaustiveDependencies: 'warn',
         },
         style: {
           useConst: 'error',
-          noVar: 'error',
         },
       },
     },

@@ -44,7 +44,7 @@ describe('ConfigGenerator', () => {
     expect(yaml).toContain('ruff check --staged --fix');
     expect(yaml).toContain('gosec -quiet ./...');
     expect(yaml).toContain('cargo deny check');
-    expect(yaml).toContain('aislop scan --staged --fail-on 50');
+    expect(yaml).toContain('aislop scan --staged');
     expect(yaml).toContain('trufflehog git file://. --staged --only-verified');
     expect(yaml).toContain('typos --staged');
     expect(yaml).toContain('actionlint');

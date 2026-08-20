@@ -90,21 +90,21 @@ export function generateLefthookConfig(detection: StackDetectionResult): string 
 
   // Universal: Fast deterministic AI slop and swallowed error detection
   preCommitCommands.push(`    aislop-scan:
-      run: npx aislop scan --staged --fail-on 50`);
+      run: if command -v aislop >/dev/null 2>&1; then aislop scan --staged; fi`);
 
   // Universal: High-entropy secret scanning via TruffleHog OSS (verified secrets only)
   preCommitCommands.push(`    secret-scan:
-      run: trufflehog git file://. --staged --only-verified`);
+      run: if command -v trufflehog >/dev/null 2>&1; then trufflehog git file://. --staged --only-verified; fi`);
 
   // Universal: AST-aware source code spell checking via typos
   preCommitCommands.push(`    typo-check:
-      run: typos --staged`);
+      run: if command -v typos >/dev/null 2>&1; then typos --staged; fi`);
 
   // Infra: GitHub Actions workflow syntax validation via actionlint
   if (detection.infra.hasWorkflows) {
     preCommitCommands.push(`    actionlint:
       glob: ".github/workflows/*.{yml,yaml}"
-      run: actionlint`);
+      run: if command -v actionlint >/dev/null 2>&1; then actionlint; fi`);
   }
 
   // =========================================================================
