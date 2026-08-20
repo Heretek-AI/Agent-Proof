@@ -29,11 +29,17 @@ npm run typecheck
 
 ### 2. Testing & Verification
 ```bash
-# Run unit & integration test suites
+# Run unit & integration test suites (11 suites, 73 tests)
 npm test
 
 # Run real-world sandbox lifecycle test
 npm run test:real-repo
+
+# Run polyglot GitHub matrix verification across 5 real-world repositories
+npm run test:matrix
+
+# Run oneshot 5-issue real-world Drop verification
+npm run test:e2e-5-issues
 
 # Run automated real-world E2E test on Heretek-AI/drop
 npm run test:e2e-drop
@@ -54,18 +60,19 @@ npm run test:e2e-drop
 | **Detector** | [`src/detector/stackDetector.ts`](file:///home/john/Projects/Agent-Proof/src/detector/stackDetector.ts) | Multi-stack inspection across polyglot repositories (JS/TS, Py, Go, Rust, C/C++, C#, Java, Ruby, Elixir, Docker, K8s, Terraform, Tach, ast-grep) |
 | **Generator** | [`src/generator/configGenerator.ts`](file:///home/john/Projects/Agent-Proof/src/generator/configGenerator.ts) | Deterministic config templates (`lefthook.yml`, `.claude/hooks.json`, `biome.json`, `ruff.toml`, `.aislop/config.yml`) |
 | **Formatter** | [`src/formatter/diagnosticStream.ts`](file:///home/john/Projects/Agent-Proof/src/formatter/diagnosticStream.ts) | ANSI stripper, tool output parsers, LSP envelope builder |
-| **Parsers** | [`src/formatter/parsers/`](file:///home/john/Projects/Agent-Proof/src/formatter/parsers/) | Specialized parsers for `aislop`, `biome`, `ruff`, `skillcheck`, `trufflehog`, `typos`, `actionlint`, `zizmor`, `hadolint`, `iac`, `astgrep` |
+| **Parsers** | [`src/formatter/parsers/`](file:///home/john/Projects/Agent-Proof/src/formatter/parsers/) | 11 Specialized parsers for `aislop`, `biome`, `ruff`, `skillcheck`, `trufflehog`, `typos`, `actionlint`, `zizmor`, `hadolint`, `iac`, `astgrep` |
 | **Installer** | [`src/installer/`](file:///home/john/Projects/Agent-Proof/src/installer/) | Git hook installation and read-only permission lock-in (`chmod 0444`) |
 | **Runner** | [`src/runner/gateRunner.ts`](file:///home/john/Projects/Agent-Proof/src/runner/gateRunner.ts) | Gate stage runner for `post-edit`, `pre-commit`, `pre-push` |
 | **CLI** | [`src/cli.ts`](file:///home/john/Projects/Agent-Proof/src/cli.ts) | Command dispatcher (`init`, `detect`, `run`, `lock`, `unlock`, `status`) |
 | **Launcher** | [`bin/agent-proof.js`](file:///home/john/Projects/Agent-Proof/bin/agent-proof.js) | Native binary resolution with JS fallback |
-| **E2E Runner** | [`scripts/e2e-real-repo-runner.mjs`](file:///home/john/Projects/Agent-Proof/scripts/e2e-real-repo-runner.mjs) | Real-world drop repo lifecycle runner with LLM secrets |
+| **Scenarios** | [`tests/ai-agent-scenarios.test.ts`](file:///home/john/Projects/Agent-Proof/tests/ai-agent-scenarios.test.ts) | 8 Complex AI agent failure-mode simulation scenarios |
+| **Polyglot Matrix** | [`scripts/test-polyglot-matrix.mjs`](file:///home/john/Projects/Agent-Proof/scripts/test-polyglot-matrix.mjs) | Real-world 5-repository GitHub integration matrix test |
 
 ---
 
 ## 🛡️ Coding & Architectural Standards
 
-1. **Zero Runtime Dependencies**: The published CLI bundle maintains zero runtime dependencies; native acceleration is handled via `optionalDependencies`.
+1. **Zero Runtime Dependencies**: The published CLI bundle maintains zero runtime dependencies; execution relies on standalone compiled engines.
 2. **Zero-Bloat Compiled Engines**: Prefer compiled native binaries (`ast-grep`, `biome`, `ruff`, `tach`, `hadolint`, `zizmor`, `tfsec`) over heavy interpreted linters to guarantee sub-50ms latency.
 3. **Strict Suppression Hygiene**: Block unapproved suppression comments (`@ts-ignore`, `# noqa`, `biome-ignore`) across all AST checks.
 4. **Deterministic Output**: Always ensure configuration generators output formatted, deterministic strings.

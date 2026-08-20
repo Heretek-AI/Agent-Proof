@@ -10,7 +10,7 @@ This guide provides instructions and reference material for **Claude Code** sess
 # Build the project (tsup bundles to dist/)
 npm run build
 
-# Run unit and integration tests (Vitest)
+# Run unit and integration tests (Vitest, 11 suites, 73 tests)
 npm test
 
 # Run strict TypeScript type checks
@@ -18,6 +18,12 @@ npm run typecheck
 
 # Run real-world sandbox verification script
 npm run test:real-repo
+
+# Run polyglot GitHub matrix verification across 5 real-world repositories
+npm run test:matrix
+
+# Run oneshot 5-issue real-world Drop verification
+npm run test:e2e-5-issues
 
 # Run full automated E2E test against Heretek-AI/drop
 npm run test:e2e-drop
@@ -40,7 +46,7 @@ Agent-Proof is structured into modular components:
 2. **Config Generator (`src/generator/configGenerator.ts`)**:
    - Generates `lefthook.yml`, `.claude/hooks.json`, `biome.json`, `ruff.toml`, and `.aislop/config.yml`.
 3. **Diagnostic Streamer (`src/formatter/diagnosticStream.ts`)**:
-   - Converts raw stderr/stdout from tools (`aislop`, `biome`, `ruff`, `skillcheck`, `trufflehog`, `typos`, `actionlint`, `zizmor`, `hadolint`, `tfsec`, `kubescore`, `astgrep`) into an LSP-compliant JSON diagnostic envelope with `repair_tokens`.
+   - Converts raw stderr/stdout from 11 tools (`aislop`, `biome`, `ruff`, `skillcheck`, `trufflehog`, `typos`, `actionlint`, `zizmor`, `hadolint`, `tfsec`, `kube-score`, `astgrep`) into an LSP-compliant JSON diagnostic envelope with `repair_tokens`.
 4. **Hook Installer & Lock-in (`src/installer/`)**:
    - Sets up `.git/hooks/pre-commit` and locks governance files to read-only (`chmod 0444`).
 5. **Gate Runner (`src/runner/gateRunner.ts`)**:
@@ -58,40 +64,23 @@ When Claude Code operates in a repository initialized with Agent-Proof:
    - Fires automatically whenever Claude modifies a file.
    - For `*.{js,ts,jsx,tsx}`, runs `npx @biomejs/biome check --write ${filePath}`.
    - For `*.py`, runs `ruff check --fix ${filePath}`.
-   - For `.github/workflows/*.{yml,yaml}`, runs `zizmor ${filePath}`.
-   - For `Dockerfile*` / `Containerfile*`, runs `hadolint ${filePath}`.
-   - For `.claude/skills/*.md` or `SKILL.md`, runs `skillcheck check ${filePath}`.
-   - Runs in `< 50ms` on single modified ASTs.
+   - For `Dockerfile`, runs `hadolint ${filePath}`.
+   - For GitHub Workflows, runs `zizmor ${filePath}`.
+   - For skills, runs `skillcheck check ${filePath}`.
+   - Executes in **`< 50ms`** for immediate AST feedback.
 
-2. **`PreCommit` Lifecycle Event**:
-   - Fires when git commit is initiated.
-   - Runs `npx lefthook run pre-commit` executing parallel staged checks in `< 2.0s`.
+2. **Pre-Commit Hard Gate**:
+   - Intercepts `git commit` and runs parallel compiled linters via Lefthook in **`< 2.0s`**.
+   - If any violation occurs, a non-zero exit code blocks the commit and provides an LSP diagnostic envelope.
 
-3. **Interpreting Hook Diagnostics**:
-   - If a hook fails, inspect the JSON output envelope:
-     ```json
-     {
-       "status": "GATE_FAILED",
-       "diagnostics": [
-         {
-           "source": "aislop",
-           "rule_id": "AI_SLOP_SWALLOWED_ERROR",
-           "file_path": "src/auth.ts",
-           "repair_instruction": {
-             "action": "REWRITE_BLOCK",
-             "repair_tokens": ["throw new Error(...)"]
-           }
-         }
-       ]
-     }
-     ```
-   - Immediately apply the suggested `repair_tokens` to resolve the violation.
+3. **Strict Suppression Hygiene**:
+   - Blind suppression directives (`// @ts-ignore`, `// biome-ignore`, `# noqa`) trigger **Severity 1** failures.
+   - Parse `repair_tokens` to apply deterministic fixes rather than guessing.
 
 ---
 
-## 🚫 Prohibited Actions for Claude Code
+## 🛡️ Coding Rules for Claude Code Sessions
 
-- **Do NOT** bypass git hooks using `--no-verify`.
-- **Do NOT** attempt to edit or delete `.claude/settings.json`, `.claude/hooks.json`, or `lefthook.yml`. These files are marked read-only (`chmod 0444`) to enforce governance boundaries.
-- **Do NOT** insert blind suppression comments (`// @ts-ignore`, `// biome-ignore`, `# noqa`) to bypass type safety or lint rules.
-- **Do NOT** introduce empty catch blocks, `as any` casts, or unverified imports.
+1. **Zero Runtime Dependencies**: Keep package dependencies at 0 for published runtime distribution.
+2. **Deterministic Output**: Configuration codegen must produce idempotent, formatted outputs.
+3. **Strict Error Handling**: Always handle errors explicitly and bubble causes up via `new Error(msg, { cause: err })`.

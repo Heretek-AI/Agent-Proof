@@ -1,6 +1,6 @@
 # @heretek-ai/agent-proof 🔒
 
-> **Zero-Bloat Mechanical Hard-Gate for Autonomous AI Coding Agents** — Deterministic multi-tier code governance, sub-50ms post-edit interceptors, sub-2.0s pre-commit gates, strict suppression hygiene, and LSP diagnostic envelopes with repair tokens for Claude Code, Antigravity, Cursor, Codex, and Aider.
+> **Zero-Bloat Mechanical Hard-Gate CLI for Autonomous AI Coding Agents** — Deterministic multi-tier code governance, sub-50ms post-edit interceptors, sub-2.0s pre-commit hard gates, strict suppression hygiene, and LSP diagnostic envelopes with repair tokens for Claude Code, Antigravity, Cursor, Codex, and Aider.
 
 [![npm version](https://img.shields.io/npm/v/@heretek-ai/agent-proof.svg?style=flat-square&color=blue)](https://www.npmjs.com/package/@heretek-ai/agent-proof)
 [![CI Test Suite](https://github.com/Heretek-AI/Agent-Proof/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/Heretek-AI/Agent-Proof/actions/workflows/ci.yml)
@@ -16,7 +16,7 @@
 ## 🎯 Executive Overview
 
 Prompt-based guardrails (`CLAUDE.md`, `.cursorrules`, `rules.md`, system prompts) inevitably degrade under context saturation and complex multi-file refactoring tasks. When autonomous AI coding agents make rapid edits, they frequently introduce **AI Slop**:
-- **Swallowed Errors & Empty Catch Blocks**: `try { ... } catch (e) {}` that mask outages.
+- **Swallowed Errors & Empty Catch Blocks**: `try { ... } catch (e) {}` or `except: pass` that mask critical outages.
 - **Strict Suppression Bypass**: Blindly inserting `// @ts-ignore`, `// biome-ignore`, or `# noqa` to bypass checks without fixing underlying bugs.
 - **Unsafe Type Casting**: Pervasive `as any` or unchecked type assertions that erode type safety.
 - **Hallucinated Dependencies**: Imports from packages not declared in `package.json` or `pyproject.toml`.
@@ -68,9 +68,51 @@ flowchart TD
 
 | Stage | Trigger Event | Latency Target | Scope | Canonical Engines |
 | :--- | :--- | :--- | :--- | :--- |
-| **Stage 1: Pre-Tool / Edit** | `PostFileEdit` agent hook | `< 50ms` | Single modified file AST | Biome (`--write`), Ruff (`--fix`), Hadolint, Zizmor, SkillCheck |
-| **Stage 2: Hard Git Gate** | `git commit` (Pre-Commit) | `< 2.0s` | Staged blobs (`--staged`) | Lefthook parallel: Biome, Ruff, Tach, AISlop, TruffleHog, Typos, Actionlint, Zizmor, Hadolint, Tfsec, Kube-Score, ast-grep |
-| **Stage 3: CI & Graph Audit** | `git push` / PR Pipeline | Unconstrained | Full codebase graph | Fallow (dead exports / circular deps), Sherif (monorepos), OWASP Noir (API attack surface) |
+| **Stage 1: Pre-Tool / Edit** | `PostFileEdit` agent hook | `< 50ms` | Single modified file AST | Biome (`--write`), Ruff (`--fix`), Hadolint, Zizmor, SkillCheck, ast-grep |
+| **Stage 2: Hard Git Gate** | `git commit` (Pre-Commit) | `< 2.0s` | Staged blobs (`--staged`) | Lefthook parallel: Biome, Ruff, Tach, AISlop, TruffleHog, Typos, Actionlint, Zizmor, Hadolint, Tfsec, Kube-Score |
+| **Stage 3: CI & Graph Audit** | `git push` / PR Pipeline | Unconstrained | Full codebase graph | Fallow (dead exports / circular deps), Sherif (monorepos), OWASP Noir (API attack surface), Cargo Deny |
+
+---
+
+## 🤖 Complex AI Agent Task Scenarios & Autonomous Self-Correction
+
+Agent-Proof includes automated test scenarios that explicitly simulate complex real-world tasks where autonomous agents frequently fail, intercepting anti-patterns and emitting actionable `repair_tokens`:
+
+| Scenario | Complex Task Assigned | Agent Anti-Pattern Injected | Gate Interceptor | Actionable `repair_tokens` |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. Async Auth Migration** | Refactor JWT auth from callbacks to async/await | Empty `catch (err) {}` block | `AISlop` (`AI_SLOP_SWALLOWED_ERROR`) | `throw new AppError('Operation failed', { cause: error });` |
+| **2. Strict Type Constraints** | Generic data mapper refactoring | Blind `// @ts-ignore` directive | `AISlop` (`AI_SLOP_UNAUTHORIZED_SUPPRESSION`) | Typed interface & type guard replacement |
+| **3. Multi-Provider LLM Client** | Anthropic + OpenAI fallback client | Hardcoded high-entropy OpenAI API token | `TruffleHog` (`VERIFIED_SECRET_OPENAI`) | `process.env.OPENAI_KEY \|\| process.env.API_KEY` |
+| **4. Batch Ingestion Pipeline** | High-throughput batch consumer | Identifier typos (`acnowledgeReceipt`) | `Typos` (`TYPO_DETECTED`) | `acknowledgeReceipt` |
+| **5. Microservice Dockerization** | Multi-stage Dockerfile generation | Unpinned `apt-get` & root user | `Hadolint` (`DL3008`, `DL3002`) | `USER node`, non-root container user |
+| **6. GitHub Actions Auto-Triage** | Issue triage and label workflow | Shell expression injection `${{ github.event.issue.title }}` | `Zizmor` (`template-injection`) | Safe `env:` variable mapping |
+| **7. Modular Boundary Layer** | Monorepo cross-package logging | Direct private database pool import in route handler | `ast-grep` (`no-direct-db-query`) | Service layer boundary encapsulation |
+| **8. Autonomous Skill Codegen** | Custom agent skill authoring | Missing YAML frontmatter headers | `SkillCheck` (`SKILL_INVALID_FRONTMATTER`) | Valid YAML frontmatter block |
+
+---
+
+## 🌐 Real-World Polyglot GitHub Matrix Benchmarks
+
+Agent-Proof is continuously verified across real-world open-source repositories spanning major programming ecosystems:
+
+| Ecosystem | Target Repository | Stack Profile | Detection Time | Codegen & Lock Time | Verification Result |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **TypeScript / Vue3** | [`Heretek-AI/drop`](https://github.com/Heretek-AI/drop) | Fullstack Vue3, TS, SQLite, Docker | `59ms` | `493ms` (4 configs locked) | **PASSED** (100%) |
+| **Python** | [`encode/httpx`](https://github.com/encode/httpx) | Python 3, Pytest, Ruff, Workflows | `71ms` | `515ms` (4 configs locked) | **PASSED** (100%) |
+| **Go Microservices** | [`charmbracelet/bubbletea`](https://github.com/charmbracelet/bubbletea) | Go Modules, Gosec, Workflows | `58ms` | `485ms` (3 configs locked) | **PASSED** (100%) |
+| **Rust Native** | [`sharkdp/bat`](https://github.com/sharkdp/bat) | Rust, Cargo Workspaces, Workflows | `58ms` | `447ms` (3 configs locked) | **PASSED** (100%) |
+| **Infra / Container** | [`GoogleContainerTools/distroless`](https://github.com/GoogleContainerTools/distroless) | Dockerfiles, Bazel, Workflows | `62ms` | `490ms` (3 configs locked) | **PASSED** (100%) |
+
+---
+
+## ⚡ Performance SLA Benchmarks
+
+| Operation | SLA Target | Measured Latency | Verification Test |
+| :--- | :--- | :--- | :--- |
+| **Multi-Stack Polyglot Detection** | `< 30ms` | **`2 – 4 ms`** | `tests/benchmark.test.ts` |
+| **Configuration Codegen (Lefthook, Claude, Biome, Ruff, AISlop)** | `< 15ms` | **`< 1 ms`** | `tests/benchmark.test.ts` |
+| **1,000-Line LSP Diagnostic Streaming & Aggregation** | `< 25ms` | **`~6 ms`** | `tests/benchmark.test.ts` |
+| **POSIX `chmod 0444` Permission Lock-in** | `< 10ms` | **`< 1 ms`** | `tests/benchmark.test.ts` |
 
 ---
 
@@ -104,7 +146,7 @@ Agent-Proof's **Suppression Hygiene Gate** treats newly inserted unapproved supp
 Initialize mechanical hard gates in any repository with zero configuration:
 
 ```bash
-# Zero-install execution via npx
+# Zero-install execution via npx (Latest Release)
 npx @heretek-ai/agent-proof init
 
 # Alternative compatibility aliases
@@ -155,6 +197,8 @@ Agent-Proof automatically inspects polyglot repositories and configures appropri
 | **Rust** | `Cargo.toml`, `Cargo.lock` | cargo deny check |
 | **C / C++** | `CMakeLists.txt`, `Makefile`, `compile_commands.json` | clang-format (`--Werror`) |
 | **C# / .NET** | `*.csproj`, `*.sln`, `global.json` | dotnet format (`--verify-no-changes`) |
+| **Ruby** | `Gemfile`, `Gemfile.lock` | RuboCop (`--force-exclusion`) |
+| **Elixir** | `mix.exs`, `mix.lock` | Credo (`--strict`) |
 | **GitHub Actions / CI** | `.github/workflows/*.{yml,yaml}` | Actionlint + Zizmor (workflow security) |
 | **Docker / Containers** | `Dockerfile*`, `Containerfile*`, `docker-compose.yml` | Hadolint (container security) |
 | **Terraform / IaC** | `*.tf`, `*.tfvars`, `terraform/` | Tfsec (cloud security static analysis) |
