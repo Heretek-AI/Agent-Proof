@@ -23,11 +23,14 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
+      - name: Build bundle
+        run: npm run build
+
       - name: Typecheck
         run: npm run typecheck
 
       - name: Run test suite
         run: npm test
 
-      - name: Build bundle
-        run: npm run build
+      - name: Run real-world sandbox verification
+        run: npm run test:real-repo
