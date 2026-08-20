@@ -37,6 +37,7 @@
     "test:real-repo": "node scripts/verify-real-repo.mjs",
     "test:e2e-drop": "node scripts/e2e-real-repo-runner.mjs",
     "test:e2e-5-issues": "node scripts/e2e-5-issues-runner.mjs",
+    "test:matrix": "node scripts/test-polyglot-matrix.mjs",
     "bump": "npm version patch",
     "prepublishOnly": "npm run build && npm test && npm run typecheck",
     "release:dry-run": "npm publish --dry-run"
