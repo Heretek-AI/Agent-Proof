@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # Required for trusted publishing (OIDC) & npm provenance
+      id-token: write # Required for OpenID Connect (OIDC) trusted publishing & npm provenance
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -44,7 +44,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
       - name: Install dependencies
@@ -100,14 +99,10 @@ jobs:
       - name: Inspect Package Contents
         run: npm pack --dry-run
 
-      - name: Publish to NPM Registry
+      - name: Publish to NPM Registry (Trusted Publishing via OIDC)
         if: ${{ !inputs.dry_run }}
         run: npm publish --access public --provenance --tag ${{ inputs.tag || 'latest' }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Dry Run Publish
         if: ${{ inputs.dry_run }}
         run: npm publish --dry-run --access public --tag ${{ inputs.tag || 'latest' }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
