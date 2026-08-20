@@ -36,10 +36,11 @@ describe('Platform-Specific Binary Packaging & Launcher', () => {
     expect(content.startsWith('#!/usr/bin/env node')).toBe(true);
 
     // Run --version through bin/agent-proof.js
+    const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8'));
     const output = execFileSync(process.execPath, [binScriptPath, '--version'], {
       encoding: 'utf-8',
     });
-    expect(output).toContain('@heretek-ai/agent-proof v1.0.0');
+    expect(output).toContain(`@heretek-ai/agent-proof v${pkg.version}`);
 
     // Run --help through bin/agent-gate.js
     const helpOutput = execFileSync(process.execPath, [binGateScriptPath, '--help'], {

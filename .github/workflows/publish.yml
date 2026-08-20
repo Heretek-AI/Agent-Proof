@@ -12,6 +12,17 @@ on:
         description: 'NPM distribution tag (e.g. latest, beta, next)'
         required: true
         default: 'latest'
+      bump:
+        description: 'Version bump strategy (auto, patch, minor, major, none)'
+        required: true
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+          - none
+        default: 'auto'
       dry_run:
         description: 'Perform dry run without publishing'
         required: false
@@ -24,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # Required for npm provenance
+      id-token: write # Required for trusted publishing (OIDC) & npm provenance
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,11 +50,52 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
-      - name: Verify & Build
+      - name: Resolve & Auto-Increment Version
+        id: version
         run: |
-          npm run typecheck
-          npm test
-          npm run build
+          LATEST_NPM=$(npm view @heretek-ai/agent-proof version 2>/dev/null || echo "0.0.0")
+          CURRENT_PKG=$(node -p "require('./package.json').version")
+          echo "Latest version published on NPM: $LATEST_NPM"
+          echo "Local package.json version: $CURRENT_PKG"
+
+          if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+            echo "Publishing tagged release: $TAG_VERSION"
+            npm version "$TAG_VERSION" --no-git-tag-version --allow-same-version
+          elif [ "${{ inputs.bump }}" = "patch" ]; then
+            npm version patch --no-git-tag-version
+          elif [ "${{ inputs.bump }}" = "minor" ]; then
+            npm version minor --no-git-tag-version
+          elif [ "${{ inputs.bump }}" = "major" ]; then
+            npm version major --no-git-tag-version
+          elif [ "${{ inputs.bump }}" = "none" ]; then
+            echo "Skipping version bump as requested"
+          else
+            # Auto-bump: check if current version is already on NPM
+            EXISTS_ON_NPM=$(npm view "@heretek-ai/agent-proof@${CURRENT_PKG}" version 2>/dev/null || echo "")
+            if [ -n "$EXISTS_ON_NPM" ] || [ "$CURRENT_PKG" = "$LATEST_NPM" ]; then
+              echo "Version $CURRENT_PKG is already published to NPM. Auto-bumping patch..."
+              npm version patch --no-git-tag-version
+            else
+              echo "Version $CURRENT_PKG is not yet published on NPM. Proceeding with current version."
+            fi
+          fi
+
+          FINAL_VERSION=$(node -p "require('./package.json').version")
+          echo "Target publish version: $FINAL_VERSION"
+          echo "version=$FINAL_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build bundle
+        run: npm run build
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run test suite
+        run: npm test
+
+      - name: Run real-world sandbox verification
+        run: npm run test:real-repo
 
       - name: Inspect Package Contents
         run: npm pack --dry-run

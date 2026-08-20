@@ -35,6 +35,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "test:real-repo": "node scripts/verify-real-repo.mjs",
+    "bump": "npm version patch",
     "prepublishOnly": "npm run build && npm test && npm run typecheck",
     "release:dry-run": "npm publish --dry-run"
   },

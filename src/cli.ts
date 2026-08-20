@@ -11,12 +11,27 @@
  * - status: Print current permission and lock status of governance files
  */
 
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { detectStack } from './detector/stackDetector.js';
 import { generateConfigs } from './generator/configGenerator.js';
 import { installHooks } from './installer/hookInstaller.js';
 import { GateLock, lockGovernance, unlockGovernance } from './installer/lockin.js';
 import { GateRunner } from './runner/gateRunner.js';
+
+/**
+ * Retrieve the current package version dynamically from package.json
+ */
+function getPackageVersion(): string {
+  try {
+    const pkgPath = path.resolve(__dirname, '../package.json');
+    if (fs.existsSync(pkgPath)) {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+      if (pkg.version) return pkg.version;
+    }
+  } catch {}
+  return '1.0.0';
+}
 
 /**
  * Display help text detailing usage, subcommands, and flags
@@ -63,7 +78,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   }
 
   if (flags.has('-v') || flags.has('--version')) {
-    console.log('@heretek-ai/agent-proof v1.0.0');
+    console.log(`@heretek-ai/agent-proof v${getPackageVersion()}`);
     return;
   }
 
