@@ -1,0 +1,44 @@
+name: E2E Real-World Drop Test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0' # Weekly Sunday run
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-drop:
+    name: E2E Drop & Claude Code Governance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Build bundle
+        run: npm run build
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code || true
+
+      - name: Run E2E Test on Heretek-AI/drop
+        run: npm run test:e2e-drop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LLM_API: ${{ secrets.LLM_API || 'https://llm.heretek.one/v1' }}
+          LLM_KEY: ${{ secrets.LLM_KEY }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL || 'MiniMax-M3' }}

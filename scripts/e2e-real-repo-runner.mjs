@@ -4,7 +4,7 @@
  * @file scripts/e2e-real-repo-runner.mjs
  * @description Automated repeatable E2E test harness that clones Heretek-AI/drop,
  * installs @heretek-ai/agent-proof, fetches an open issue from Drop-OSS/drop,
- * and drives Claude Code under active mechanical gate governance.
+ * and drives Claude Code under active mechanical gate governance using LLM credentials.
  */
 
 import * as fs from 'node:fs';
@@ -22,10 +22,18 @@ const binPath = path.join(rootDir, 'bin', 'agent-proof.js');
 const sandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-proof-e2e-drop-'));
 const repoUrl = 'https://github.com/Heretek-AI/drop.git';
 
+// Organization LLM settings
+const llmApi = process.env.LLM_API || 'https://llm.heretek.one/v1';
+const llmKey = process.env.LLM_KEY || process.env.ANTHROPIC_API_KEY || '';
+const llmModel = process.env.LLM_MODEL || 'MiniMax-M3';
+
 console.log('\n======================================================');
 console.log(' 🚀 E2E Real-World Test: Heretek-AI/drop + Agent-Proof');
 console.log('======================================================');
-console.log(`📁 Sandbox Workspace: ${sandboxDir}\n`);
+console.log(`📁 Sandbox Workspace: ${sandboxDir}`);
+console.log(`🌐 LLM Endpoint:      ${llmApi}`);
+console.log(`🤖 LLM Model:         ${llmModel}`);
+console.log(`🔑 LLM Auth:          ${llmKey ? 'Configured (Secret Present)' : 'Not Configured (Using Mechanical Sim)'}\n`);
 
 /**
  * Helper to run test steps with timing and logging
@@ -143,7 +151,39 @@ try {
   // STEP 5: Drive Claude Code / Gate Interception & Verification
   // ---------------------------------------------------------------------------
   await runStep(5, 'Driving Claude Code & Validating Mechanical Gate Interception', async () => {
-    // 1. Verify PostFileEdit hook execution (< 300ms)
+    // 1. If LLM credentials and Claude CLI exist, drive Claude on the issue
+    if (llmKey) {
+      console.log(`   • Driving Claude Code with model ${llmModel} at ${llmApi}...`);
+      try {
+        const claudeEnv = {
+          ...process.env,
+          ANTHROPIC_BASE_URL: llmApi,
+          ANTHROPIC_API_KEY: llmKey,
+          ANTHROPIC_MODEL: llmModel,
+          OPENAI_BASE_URL: llmApi,
+          OPENAI_API_KEY: llmKey,
+          OPENAI_MODEL: llmModel,
+        };
+
+        const claudePrompt = `Analyze Issue #${targetIssue.number}: "${targetIssue.title}". Create a fix in server/utils/igdb-fix.ts ensuring that company logos handle missing media IDs gracefully without empty catch blocks.`;
+        const claudeProc = spawnSync('claude', ['-p', claudePrompt, '--dangerously-skip-permissions'], {
+          cwd: sandboxDir,
+          env: claudeEnv,
+          encoding: 'utf-8',
+          timeout: 60000,
+        });
+
+        console.log(`   • Claude Code completed with exit code ${claudeProc.status}`);
+        if (claudeProc.stdout) {
+          const preview = claudeProc.stdout.slice(0, 300).replace(/\n/g, ' ');
+          console.log(`   • Claude Output: ${preview}...`);
+        }
+      } catch (err) {
+        console.log(`   • Claude invocation note: ${err.message}`);
+      }
+    }
+
+    // 2. Verify PostFileEdit hook execution (< 300ms)
     console.log('   • Testing PostFileEdit mechanical gate execution...');
     const testFilePath = path.join(sandboxDir, 'server', 'utils', 'igdb.ts');
     
@@ -167,7 +207,7 @@ export async function fetchCompanyLogo(mediaId?: string): Promise<string | null>
     console.log(`   • PostFileEdit Gate: ${postEditDuration.toFixed(0)}ms (Target < 300ms)`);
     console.log(`   • Gate Output: ${postEditOutput.trim()}`);
 
-    // 2. Test Pre-Commit Gate (< 2.0s)
+    // 3. Test Pre-Commit Gate (< 2.0s)
     console.log('   • Testing Stage 2 Pre-Commit Gate on staged files...');
     execFileSync('git', ['add', testFilePath], { cwd: sandboxDir });
 
@@ -179,12 +219,7 @@ export async function fetchCompanyLogo(mediaId?: string): Promise<string | null>
     const preCommitDuration = performance.now() - preCommitStart;
     console.log(`   • Pre-Commit Gate: ${preCommitDuration.toFixed(0)}ms (Target < 2000ms)`);
 
-    // Pre-commit should pass cleanly on valid clean code
-    if (preCommitResult.status !== 0) {
-      console.log(`Pre-commit output:\n${preCommitResult.stdout}\n${preCommitResult.stderr}`);
-    }
-
-    // 3. Test Slop Interception: Inject an anti-pattern and verify detection
+    // 4. Test Slop Interception: Inject an anti-pattern and verify detection
     console.log('   • Injecting AI slop anti-pattern to test mechanical interception...');
     const slopFilePath = path.join(sandboxDir, 'server', 'utils', 'auth-check.ts');
     fs.writeFileSync(slopFilePath, `
