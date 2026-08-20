@@ -1,3 +1,8 @@
+/**
+ * @file src/formatter/index.ts
+ * @description Exports diagnostic streaming and output formatting modules.
+ */
+
 export * from './ansi.js';
 export * from './diagnosticStream.js';
 export * from './parsers/aislop.js';

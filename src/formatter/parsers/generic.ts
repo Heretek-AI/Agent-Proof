@@ -1,63 +1,79 @@
+/**
+ * @file src/formatter/parsers/generic.ts
+ * @description Fallback generic output parser for unrecognized tools and standard error streams.
+ */
+
 import type { DiagnosticItem } from '../../types/index.js';
 import { stripAnsi } from '../ansi.js';
 
-export function parseGenericOutput(rawOutput: string, sourceName: string = 'gate'): DiagnosticItem[] {
+/**
+ * Parse arbitrary tool error output into structured DiagnosticItems using standard heuristics.
+ *
+ * @param rawOutput Raw error string from an unclassified tool
+ * @param toolName Name of the tool producing the output
+ * @returns Array of DiagnosticItem objects
+ */
+export function parseGenericOutput(rawOutput: string, toolName: string = 'unknown'): DiagnosticItem[] {
   const clean = stripAnsi(rawOutput);
   const diagnostics: DiagnosticItem[] = [];
-
   const lines = clean.split('\n');
+
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    // Matches standard Unix error formats:
-    // path/to/file.ext:10:5: error message
-    // path/to/file.ext:10: error message
-    const match = trimmed.match(/^([^\s:]+\.[a-zA-Z0-9_-]+):(\d+)(?::(\d+))?:\s*(?:([a-zA-Z0-9_\-\/]+):)?\s*(.*)$/);
-    if (match) {
-      const [, filePath, lineStr, colStr, ruleId, msg] = match;
-      const lineNum = parseInt(lineStr, 10);
-      const colNum = colStr ? parseInt(colStr, 10) : 1;
-
+    // Pattern 1: filePath:line:col: message
+    const match1 = trimmed.match(/^([^\s:]+):(\d+):(\d+):\s*(.*)$/);
+    if (match1) {
+      const [, filePath, lineStr, colStr, message] = match1;
       diagnostics.push({
-        source: sourceName,
-        rule_id: ruleId || `${sourceName.toUpperCase()}_ERROR`,
-        severity: msg.toLowerCase().includes('warning') ? 'WARNING' : 'ERROR',
+        source: toolName,
+        rule_id: `${toolName.toUpperCase()}_ERROR`,
+        severity: 'ERROR',
         file_path: filePath,
         range: {
-          start: { line: lineNum, column: colNum },
-          end: { line: lineNum, column: colNum + 20 },
+          start: { line: parseInt(lineStr, 10), column: parseInt(colStr, 10) },
+          end: { line: parseInt(lineStr, 10), column: parseInt(colStr, 10) + 20 },
         },
-        error_message: msg.trim() || 'Tool validation failed',
+        error_message: message.trim(),
         repair_instruction: {
           action: 'MANUAL_FIX',
-          description: `Fix the issue reported by ${sourceName}.`,
-          repair_tokens: [`// Resolve ${ruleId || 'error'} in ${filePath}`],
+          description: `Resolve ${toolName} violation in ${filePath}`,
+          repair_tokens: [`# Fix violation reported by ${toolName}`],
+        },
+      });
+      continue;
+    }
+
+    // Pattern 2: Generic error line
+    if (trimmed.toLowerCase().includes('error') || trimmed.toLowerCase().includes('failed')) {
+      diagnostics.push({
+        source: toolName,
+        rule_id: `${toolName.toUpperCase()}_FAILURE`,
+        severity: 'ERROR',
+        file_path: 'codebase',
+        error_message: trimmed,
+        repair_instruction: {
+          action: 'MANUAL_FIX',
+          description: `Resolve error reported by ${toolName}`,
+          repair_tokens: [`# Resolve ${toolName} failure: ${trimmed}`],
         },
       });
     }
   }
 
-  const lower = clean.toLowerCase();
-  const isSuccessMessage =
-    lower.includes('no errors') ||
-    lower.includes('0 errors') ||
-    lower.includes('passed') ||
-    lower.includes('checked') ||
-    lower.includes('success');
-
-  if (diagnostics.length === 0 && clean.trim().length > 0 && !isSuccessMessage) {
-    // If no line-based match was found, emit a general gate diagnostic
+  // If no specific lines matched but rawOutput is non-empty, emit a single diagnostic item
+  if (diagnostics.length === 0 && clean.trim().length > 0) {
     diagnostics.push({
-      source: sourceName,
-      rule_id: `${sourceName.toUpperCase()}_GATE_FAILURE`,
+      source: toolName,
+      rule_id: `${toolName.toUpperCase()}_ERROR`,
       severity: 'ERROR',
-      file_path: 'workspace',
-      error_message: clean.trim().slice(0, 500),
+      file_path: 'codebase',
+      error_message: clean.trim().split('\n')[0] || `${toolName} execution failed`,
       repair_instruction: {
         action: 'MANUAL_FIX',
-        description: `Review output from ${sourceName} and fix failing constraints.`,
-        repair_tokens: ['// Check error output and resolve failing check'],
+        description: `Investigate and resolve ${toolName} failure.`,
+        repair_tokens: [`# Fix ${toolName} failure`],
       },
     });
   }

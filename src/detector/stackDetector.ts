@@ -1,22 +1,49 @@
+/**
+ * @file src/detector/stackDetector.ts
+ * @description Multi-stack auto-detection engine for repository inspection.
+ *
+ * Scans the filesystem to detect active programming languages, build systems,
+ * package managers, container infrastructure, CI workflows, and AI agent harnesses.
+ * Provides deterministic metadata to configure mechanical hard gates.
+ */
+
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { StackDetectionResult } from '../types/index.js';
 
+/**
+ * Options for configuring the StackDetector instance
+ */
 export interface StackDetectorOptions {
+  /** Working directory to inspect (defaults to process.cwd()) */
   cwd?: string;
 }
 
+/**
+ * Multi-Stack Auto-Detection Engine.
+ * Inspects a repository directory to identify language ecosystems,
+ * monorepos, workflows, and agent harnesses.
+ */
 export class StackDetector {
+  /** Resolved absolute path of the target repository root */
   private readonly rootPath: string;
 
+  /**
+   * Initialize a new StackDetector instance
+   * @param options Configuration options including target working directory
+   */
   constructor(options: StackDetectorOptions = {}) {
     this.rootPath = path.resolve(options.cwd || process.cwd());
   }
 
   /**
-   * Run full stack detection across the target repository
+   * Run full multi-stack detection across the target repository.
+   * Inspects JS/TS, Python, Go, Rust, Infrastructure, and Agent Harnesses.
+   *
+   * @returns Comprehensive StackDetectionResult object with boolean flags and file lists.
    */
   public detect(): StackDetectionResult {
+    // 1. Inspect individual technology stacks
     const jsTs = this.detectJsTs();
     const python = this.detectPython();
     const go = this.detectGo();
@@ -24,6 +51,7 @@ export class StackDetector {
     const infra = this.detectInfra();
     const agentHarness = this.detectAgentHarness();
 
+    // 2. Assemble high-level primary stack list for summary reporting
     const primaryStacks: string[] = [];
     if (jsTs.detected) primaryStacks.push('JavaScript/TypeScript');
     if (python.detected) primaryStacks.push('Python');
@@ -32,6 +60,7 @@ export class StackDetector {
     if (infra.detected) primaryStacks.push('Workflows/Infra');
     if (agentHarness.detected) primaryStacks.push('Agent Harness');
 
+    // 3. Compute total indicator count across all detected categories
     const totalIndicators =
       jsTs.files.length +
       python.files.length +
@@ -56,7 +85,12 @@ export class StackDetector {
     };
   }
 
+  /**
+   * Detect JavaScript and TypeScript ecosystem indicators.
+   * Checks for package manifests, TypeScript configs, Biome configs, and monorepo configurations.
+   */
   private detectJsTs() {
+    // Canonical indicator files for JS/TS projects and package managers
     const indicators = [
       'package.json',
       'tsconfig.json',
@@ -77,20 +111,24 @@ export class StackDetector {
     let isMonorepo = false;
     let packageManager: 'npm' | 'pnpm' | 'yarn' | 'bun' | 'deno' | undefined;
 
+    // Check presence of indicator files on disk
     for (const indicator of indicators) {
       if (this.fileExists(indicator)) {
         detectedFiles.push(indicator);
       }
     }
 
+    // Check for explicit TypeScript config
     if (this.fileExists('tsconfig.json')) {
       hasTypeScript = true;
     }
 
+    // Check for existing Biome configuration
     if (this.fileExists('biome.json') || this.fileExists('biome.jsonc')) {
       hasBiome = true;
     }
 
+    // Determine package manager by lockfile priority
     if (this.fileExists('pnpm-lock.yaml')) {
       packageManager = 'pnpm';
     } else if (this.fileExists('yarn.lock')) {
@@ -103,10 +141,12 @@ export class StackDetector {
       packageManager = 'npm';
     }
 
+    // Determine monorepo workspace indicators (pnpm, lerna, turbo, nx)
     if (this.fileExists('pnpm-workspace.yaml') || this.fileExists('lerna.json') || this.fileExists('turbo.json') || this.fileExists('nx.json')) {
       isMonorepo = true;
     } else if (this.fileExists('package.json')) {
       try {
+        // Read package.json to check for workspaces, dependencies, and packageManager field
         const pkgContent = JSON.parse(fs.readFileSync(this.resolvePath('package.json'), 'utf-8'));
         if (pkgContent.workspaces) {
           isMonorepo = true;
@@ -124,7 +164,7 @@ export class StackDetector {
           }
         }
       } catch {
-        // ignore parse error
+        // Silently continue if package.json cannot be parsed
       }
     }
 
@@ -138,6 +178,10 @@ export class StackDetector {
     };
   }
 
+  /**
+   * Detect Python ecosystem indicators.
+   * Checks for pyproject.toml, requirements.txt, Pipfile, poetry, and Ruff linter configurations.
+   */
   private detectPython() {
     const indicators = [
       'pyproject.toml',
@@ -157,12 +201,14 @@ export class StackDetector {
     let hasPyproject = false;
     let hasRuffConfig = false;
 
+    // Check presence of Python indicator files
     for (const indicator of indicators) {
       if (this.fileExists(indicator)) {
         detectedFiles.push(indicator);
       }
     }
 
+    // Inspect pyproject.toml for [tool.ruff] table
     if (this.fileExists('pyproject.toml')) {
       hasPyproject = true;
       try {
@@ -171,10 +217,11 @@ export class StackDetector {
           hasRuffConfig = true;
         }
       } catch {
-        // ignore read error
+        // Silently continue if pyproject.toml cannot be read
       }
     }
 
+    // Check for dedicated ruff.toml configuration
     if (this.fileExists('ruff.toml') || this.fileExists('.ruff.toml')) {
       hasRuffConfig = true;
     }
@@ -187,6 +234,9 @@ export class StackDetector {
     };
   }
 
+  /**
+   * Detect Go ecosystem indicators (go.mod, go.sum, Gopkg.toml).
+   */
   private detectGo() {
     const indicators = ['go.mod', 'go.sum', 'Gopkg.toml'];
     const detectedFiles: string[] = [];
@@ -203,6 +253,9 @@ export class StackDetector {
     };
   }
 
+  /**
+   * Detect Rust ecosystem indicators (Cargo.toml, Cargo.lock, multi-crate workspaces).
+   */
   private detectRust() {
     const indicators = ['Cargo.toml', 'Cargo.lock'];
     const detectedFiles: string[] = [];
@@ -214,6 +267,7 @@ export class StackDetector {
       }
     }
 
+    // Check if Cargo.toml defines a [workspace]
     if (this.fileExists('Cargo.toml')) {
       try {
         const content = fs.readFileSync(this.resolvePath('Cargo.toml'), 'utf-8');
@@ -221,7 +275,7 @@ export class StackDetector {
           isWorkspace = true;
         }
       } catch {
-        // ignore read error
+        // Silently continue if Cargo.toml cannot be read
       }
     }
 
@@ -232,10 +286,14 @@ export class StackDetector {
     };
   }
 
+  /**
+   * Detect Infrastructure, CI workflows, and Docker container definitions.
+   */
   private detectInfra() {
     const workflowFiles: string[] = [];
     const dockerFiles: string[] = [];
 
+    // Scan .github/workflows directory for YAML workflow files
     const workflowsDir = this.resolvePath('.github/workflows');
     if (this.dirExists('.github/workflows')) {
       try {
@@ -246,10 +304,11 @@ export class StackDetector {
           }
         }
       } catch {
-        // ignore read error
+        // Silently continue if workflows directory cannot be read
       }
     }
 
+    // Check for Docker and container configuration files
     const dockerIndicators = [
       'Dockerfile',
       'Containerfile',
@@ -275,6 +334,9 @@ export class StackDetector {
     };
   }
 
+  /**
+   * Detect AI agent harness files, skill markdown definitions, and instructions.
+   */
   private detectAgentHarness() {
     const files: string[] = [];
     let hasClaude = false;
@@ -282,6 +344,7 @@ export class StackDetector {
     let hasSkillFiles = false;
     let hasAgentsMd = false;
 
+    // Check for Claude Code harness directory and settings
     if (this.dirExists('.claude')) {
       hasClaude = true;
       files.push('.claude/');
@@ -289,27 +352,32 @@ export class StackDetector {
       if (this.fileExists('.claude/hooks.json')) files.push('.claude/hooks.json');
     }
 
+    // Check for CLAUDE.md instruction file
     if (this.fileExists('CLAUDE.md')) {
       hasClaude = true;
       files.push('CLAUDE.md');
     }
 
+    // Check for Cursor IDE rules and directory
     if (this.dirExists('.cursor') || this.fileExists('.cursorrules')) {
       hasCursor = true;
       if (this.dirExists('.cursor')) files.push('.cursor/');
       if (this.fileExists('.cursorrules')) files.push('.cursorrules');
     }
 
+    // Check for AGENTS.md multi-agent manifest
     if (this.fileExists('AGENTS.md')) {
       hasAgentsMd = true;
       files.push('AGENTS.md');
     }
 
+    // Check for root SKILL.md definition
     if (this.fileExists('SKILL.md')) {
       hasSkillFiles = true;
       files.push('SKILL.md');
     }
 
+    // Check for .claude/skills/*.md individual skill definitions
     const skillsDir = this.resolvePath('.claude/skills');
     if (this.dirExists('.claude/skills')) {
       try {
@@ -321,7 +389,7 @@ export class StackDetector {
           }
         }
       } catch {
-        // ignore read error
+        // Silently continue if skills directory cannot be read
       }
     }
 
@@ -335,6 +403,9 @@ export class StackDetector {
     };
   }
 
+  /**
+   * Helper to check if a relative path exists and is a file
+   */
   private fileExists(relPath: string): boolean {
     const fullPath = this.resolvePath(relPath);
     try {
@@ -344,6 +415,9 @@ export class StackDetector {
     }
   }
 
+  /**
+   * Helper to check if a relative path exists and is a directory
+   */
   private dirExists(relPath: string): boolean {
     const fullPath = this.resolvePath(relPath);
     try {
@@ -353,11 +427,18 @@ export class StackDetector {
     }
   }
 
+  /**
+   * Resolve a relative path against the repository root
+   */
   private resolvePath(relPath: string): string {
     return path.resolve(this.rootPath, relPath);
   }
 }
 
+/**
+ * Functional convenience wrapper to detect stacks in a repository
+ * @param cwd Target directory (defaults to current working directory)
+ */
 export function detectStack(cwd?: string): StackDetectionResult {
   return new StackDetector({ cwd }).detect();
 }

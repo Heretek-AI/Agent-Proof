@@ -1,3 +1,16 @@
+/**
+ * @file src/generator/configGenerator.ts
+ * @description Configuration and multi-tier pipeline generator engine.
+ *
+ * Emits deterministic configuration files matching detected repository stacks:
+ * - lefthook.yml: Multi-threaded parallel git hook runner
+ * - .claude/hooks.json: Stage 1 agent lifecycle tool interceptor
+ * - .claude/settings.json: Locked agent governance settings
+ * - biome.json: Biome sub-millisecond JS/TS linter/formatter config
+ * - ruff.toml: Ruff sub-millisecond Python linter/formatter config
+ * - .aislop/config.yml: AISlop deterministic code smell rules
+ */
+
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { GeneratedConfig, GenerationResult, StackDetectionResult } from '../types/index.js';
@@ -7,27 +20,45 @@ import { generateBiomeConfig } from './templates/biome.js';
 import { generateRuffConfig } from './templates/ruff.js';
 import { generateAislopConfig } from './templates/aislop.js';
 
+/**
+ * Options for configuring the ConfigGenerator instance
+ */
 export interface ConfigGeneratorOptions {
+  /** Target root directory for configuration generation (defaults to process.cwd()) */
   cwd?: string;
+  /** If true, existing configuration files will be overwritten */
   overwrite?: boolean;
 }
 
+/**
+ * Multi-Tier Pipeline Configuration Generator.
+ * Translates StackDetectionResult metadata into concrete, deterministic config files.
+ */
 export class ConfigGenerator {
+  /** Resolved absolute path of the target repository root */
   private readonly rootPath: string;
+  /** Whether to overwrite existing files on disk */
   private readonly overwrite: boolean;
 
+  /**
+   * Initialize a new ConfigGenerator instance
+   * @param options Generator configuration options
+   */
   constructor(options: ConfigGeneratorOptions = {}) {
     this.rootPath = path.resolve(options.cwd || process.cwd());
     this.overwrite = options.overwrite ?? false;
   }
 
   /**
-   * Compute configuration files to be generated for the detected stack
+   * Compute configuration files to be generated for the detected stacks without writing to disk.
+   *
+   * @param detection Stack detection result containing language and workflow indicators
+   * @returns Array of GeneratedConfig objects with paths, contents, and descriptions
    */
   public generate(detection: StackDetectionResult): GeneratedConfig[] {
     const configs: GeneratedConfig[] = [];
 
-    // 1. Lefthook Orchestration Config (Stage 2 & Stage 3)
+    // 1. Lefthook Git Hook Runner Config (Stage 2 Pre-Commit & Stage 3 Pre-Push)
     configs.push({
       path: 'lefthook.yml',
       content: generateLefthookConfig(detection),
@@ -80,7 +111,10 @@ export class ConfigGenerator {
   }
 
   /**
-   * Write generated configurations to disk
+   * Write generated configurations to disk, creating parent directories as needed.
+   *
+   * @param detection Stack detection result
+   * @returns GenerationResult containing written and skipped file lists
    */
   public writeToDisk(detection: StackDetectionResult): GenerationResult {
     const configs = this.generate(detection);
@@ -91,15 +125,18 @@ export class ConfigGenerator {
       const fullPath = path.resolve(this.rootPath, config.path);
       const dirName = path.dirname(fullPath);
 
+      // Skip file if it already exists and overwrite flag is not set
       if (fs.existsSync(fullPath) && !this.overwrite) {
         skippedFiles.push(config.path);
         continue;
       }
 
+      // Ensure parent directory exists
       if (!fs.existsSync(dirName)) {
         fs.mkdirSync(dirName, { recursive: true });
       }
 
+      // Write file contents to disk
       fs.writeFileSync(fullPath, config.content, 'utf-8');
       writtenFiles.push(config.path);
     }
@@ -112,6 +149,11 @@ export class ConfigGenerator {
   }
 }
 
+/**
+ * Functional convenience wrapper to generate and write configurations
+ * @param detection Stack detection result
+ * @param options Generator options
+ */
 export function generateConfigs(detection: StackDetectionResult, options?: ConfigGeneratorOptions): GenerationResult {
   return new ConfigGenerator(options).writeToDisk(detection);
 }

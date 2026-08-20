@@ -1,11 +1,26 @@
+/**
+ * @file src/formatter/parsers/aislop.ts
+ * @description AISlop output parser for deterministic AI code smells and slop detection.
+ *
+ * Extracts violations for swallowed errors, empty catch blocks, hallucinated imports,
+ * dead code, and unsafe type casts, and generates actionable repair tokens for LLMs.
+ */
+
 import type { DiagnosticItem } from '../../types/index.js';
 import { stripAnsi } from '../ansi.js';
 
+/**
+ * Parse raw output from the `aislop` CLI tool into structured DiagnosticItems.
+ * Supports both JSON payload formats and standard CLI text output.
+ *
+ * @param rawOutput Raw stdout/stderr string from aislop
+ * @returns Array of DiagnosticItem objects with rule IDs and repair instructions
+ */
 export function parseAislopOutput(rawOutput: string): DiagnosticItem[] {
   const clean = stripAnsi(rawOutput);
   const diagnostics: DiagnosticItem[] = [];
 
-  // Check if output is JSON
+  // 1. Check if output is JSON
   if (clean.trim().startsWith('{') || clean.trim().startsWith('[')) {
     try {
       const parsed = JSON.parse(clean);
@@ -29,21 +44,18 @@ export function parseAislopOutput(rawOutput: string): DiagnosticItem[] {
       }
       if (diagnostics.length > 0) return diagnostics;
     } catch {
-      // Continue to regex parser
+      // Continue to regex parser if JSON parse fails
     }
   }
 
-  // Regex parser for CLI textual output
-  // Example pattern 1: [AISLOP] (AI_SLOP_SWALLOWED_ERROR) src/controllers/auth.ts:88:7: Empty catch block silently suppresses error
-  // Example pattern 2: src/controllers/auth.ts:88:7: [AI_SLOP_SWALLOWED_ERROR] Empty catch block
-  // Example pattern 3: AI_SLOP_SWALLOWED_ERROR at src/auth.ts:88: Empty catch block
+  // 2. Regex parser for CLI textual output
   const lines = clean.split('\n');
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
 
-    // Pattern: filePath:line:col: [RULE_ID] message or error message
+    // Pattern 1: filePath:line:col: [RULE_ID] message
     const match1 = line.match(/^([^\s:]+):(\d+):(\d+):\s*(?:\[([^\]]+)\])?\s*(.*)$/);
     if (match1) {
       const [, filePath, lineStr, colStr, ruleId, msg] = match1;
@@ -63,7 +75,7 @@ export function parseAislopOutput(rawOutput: string): DiagnosticItem[] {
       continue;
     }
 
-    // Pattern: [AISLOP] (RULE_ID) file:line - message
+    // Pattern 2: [aislop] (RULE_ID) file:line - message
     const match2 = line.match(/\[aislop\]\s*(?:\(([^)]+)\))?\s*([^\s:]+)(?::(\d+))?(?::(\d+))?[:\s-]+(.*)/i);
     if (match2) {
       const [, ruleId, filePath, lineStr, colStr, msg] = match2;
@@ -85,7 +97,7 @@ export function parseAislopOutput(rawOutput: string): DiagnosticItem[] {
       continue;
     }
 
-    // Pattern: AI Slop score exceeded
+    // Pattern 3: AI Slop score threshold exceeded
     if (line.toLowerCase().includes('slop score') || line.toLowerCase().includes('fail-on')) {
       diagnostics.push({
         source: 'aislop',
@@ -107,6 +119,9 @@ export function parseAislopOutput(rawOutput: string): DiagnosticItem[] {
   return diagnostics;
 }
 
+/**
+ * Infer rule identifier from error message text
+ */
 function detectRuleFromMessage(msg: string = ''): string {
   const m = msg.toLowerCase();
   if (m.includes('catch') || m.includes('swallow') || m.includes('silent')) {
@@ -124,6 +139,9 @@ function detectRuleFromMessage(msg: string = ''): string {
   return 'AI_SLOP_PATTERN_DETECTED';
 }
 
+/**
+ * Generate actionable repair tokens based on the identified AISlop rule
+ */
 function generateAislopRepair(ruleId: string = '', snippet?: string): DiagnosticItem['repair_instruction'] {
   const r = ruleId.toUpperCase();
   if (r.includes('SWALLOW') || r.includes('CATCH') || r.includes('EMPTY')) {

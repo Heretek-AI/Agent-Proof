@@ -1,3 +1,14 @@
+/**
+ * @file src/generator/templates/ruff.ts
+ * @description Generates the ruff.toml configuration for sub-millisecond Python linting and formatting.
+ */
+
+/**
+ * Generate a strict Ruff configuration targeting Python 3.10+ with rules
+ * for pyflakes (F), pycodestyle (E, W), flake8-bugbear (B), and simplify (SIM).
+ *
+ * @returns Formatted TOML string for ruff.toml
+ */
 export function generateRuffConfig(): string {
   return `# Ruff Configuration for Agent-Proof Mechanical Hard-Gate
 line-length = 100

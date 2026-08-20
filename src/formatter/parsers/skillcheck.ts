@@ -1,57 +1,62 @@
+/**
+ * @file src/formatter/parsers/skillcheck.ts
+ * @description SkillCheck output parser for agent skill files and markdown instructions.
+ */
+
 import type { DiagnosticItem } from '../../types/index.js';
 import { stripAnsi } from '../ansi.js';
 
+/**
+ * Parse raw stdout/stderr from `skillcheck` into structured DiagnosticItems.
+ *
+ * @param rawOutput Raw terminal output from SkillCheck
+ * @returns Array of DiagnosticItem objects with YAML frontmatter repair tokens
+ */
 export function parseSkillcheckOutput(rawOutput: string): DiagnosticItem[] {
   const clean = stripAnsi(rawOutput);
   const diagnostics: DiagnosticItem[] = [];
-
-  // Check JSON
-  if (clean.trim().startsWith('{') || clean.trim().startsWith('[')) {
-    try {
-      const parsed = JSON.parse(clean);
-      const items = Array.isArray(parsed) ? parsed : (parsed.violations || parsed.diagnostics || [parsed]);
-      for (const item of items) {
-        diagnostics.push({
-          source: 'skillcheck',
-          rule_id: item.rule_id || item.rule || 'SKILL_CHECK_VIOLATION',
-          severity: (item.severity || 'ERROR').toUpperCase() as any,
-          file_path: item.file_path || item.file || 'SKILL.md',
-          range: item.range || {
-            start: { line: item.line || 1, column: item.column || 1 },
-            end: { line: item.end_line || item.line || 1, column: item.end_column || 80 },
-          },
-          code_snippet: item.snippet,
-          error_message: item.message || 'Agent skill validation failed',
-          repair_instruction: generateSkillcheckRepair(item.rule_id || item.rule),
-        });
-      }
-      if (diagnostics.length > 0) return diagnostics;
-    } catch {
-      // Continue to regex
-    }
-  }
-
-  // Regex parser
   const lines = clean.split('\n');
-  for (const line of lines) {
-    const match = line.match(/^([^\s:]+\.md)(?::(\d+))?(?::(\d+))?:\s*(?:\[([^\]]+)\])?\s*(.*)$/i);
-    if (match) {
-      const [, filePath, lineStr, colStr, ruleId, msg] = match;
-      const lineNum = lineStr ? parseInt(lineStr, 10) : 1;
-      const colNum = colStr ? parseInt(colStr, 10) : 1;
-      const effectiveRuleId = ruleId || detectSkillRule(msg);
 
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Pattern 1: filePath:line:col: [RULE_ID] message
+    const match = trimmed.match(/^([^\s:]+):(\d+):(\d+):\s*(?:\[([^\]]+)\])?\s*(.*)$/);
+    if (match) {
+      const [, filePath, lineStr, colStr, ruleId, message] = match;
+      const effectiveRuleId = ruleId || 'SKILL_VALIDATION_ERROR';
       diagnostics.push({
         source: 'skillcheck',
         rule_id: effectiveRuleId,
         severity: 'ERROR',
         file_path: filePath,
         range: {
-          start: { line: lineNum, column: colNum },
-          end: { line: lineNum, column: colNum + 30 },
+          start: { line: parseInt(lineStr, 10), column: parseInt(colStr, 10) },
+          end: { line: parseInt(lineStr, 10), column: parseInt(colStr, 10) + 30 },
         },
-        error_message: msg.trim() || 'Agent skill configuration violation',
-        repair_instruction: generateSkillcheckRepair(effectiveRuleId),
+        error_message: message.trim(),
+        repair_instruction: generateSkillRepair(effectiveRuleId, message.trim()),
+      });
+      continue;
+    }
+
+    // Pattern 2: [skillcheck] error in filePath: message
+    const match2 = trimmed.match(/\[skillcheck\]\s*(?:error|warning)?\s*(?:in\s+)?([^\s:]+)(?::(\d+))?:\s*(.*)/i);
+    if (match2) {
+      const [, filePath, lineStr, message] = match2;
+      const lineNum = lineStr ? parseInt(lineStr, 10) : 1;
+      diagnostics.push({
+        source: 'skillcheck',
+        rule_id: 'SKILL_VALIDATION_ERROR',
+        severity: 'ERROR',
+        file_path: filePath,
+        range: {
+          start: { line: lineNum, column: 1 },
+          end: { line: lineNum, column: 40 },
+        },
+        error_message: message.trim(),
+        repair_instruction: generateSkillRepair('SKILL_VALIDATION_ERROR', message.trim()),
       });
     }
   }
@@ -59,26 +64,12 @@ export function parseSkillcheckOutput(rawOutput: string): DiagnosticItem[] {
   return diagnostics;
 }
 
-function detectSkillRule(msg: string = ''): string {
-  const m = msg.toLowerCase();
-  if (m.includes('frontmatter') || m.includes('yaml') || m.includes('header')) {
-    return 'SKILL_INVALID_FRONTMATTER';
-  }
-  if (m.includes('permission') || m.includes('grant') || m.includes('over-grant')) {
-    return 'SKILL_OVER_GRANTED_PERMISSIONS';
-  }
-  if (m.includes('prompt injection') || m.includes('escape') || m.includes('security')) {
-    return 'SKILL_SECURITY_RISK';
-  }
-  if (m.includes('trigger') || m.includes('description')) {
-    return 'SKILL_MISSING_METADATA';
-  }
-  return 'SKILL_VALIDATION_ERROR';
-}
-
-function generateSkillcheckRepair(ruleId: string = ''): DiagnosticItem['repair_instruction'] {
-  const r = ruleId.toUpperCase();
-  if (r.includes('FRONTMATTER') || r.includes('METADATA')) {
+/**
+ * Generate actionable YAML frontmatter repair tokens for skill files
+ */
+function generateSkillRepair(ruleId: string, message: string): DiagnosticItem['repair_instruction'] {
+  const m = message.toLowerCase();
+  if (m.includes('frontmatter') || m.includes('header') || ruleId.includes('FRONTMATTER')) {
     return {
       action: 'REWRITE_BLOCK',
       description: 'Ensure skill file starts with valid YAML frontmatter containing name and description.',
@@ -91,19 +82,9 @@ function generateSkillcheckRepair(ruleId: string = ''): DiagnosticItem['repair_i
     };
   }
 
-  if (r.includes('PERMISSION') || r.includes('SECURITY')) {
-    return {
-      action: 'REWRITE_BLOCK',
-      description: 'Restrict permissions to the minimal set of required tools and paths.',
-      repair_tokens: [
-        '# Enforce least-privilege tool access boundaries',
-      ],
-    };
-  }
-
   return {
-    action: 'MANUAL_FIX',
-    description: 'Format agent skill markdown according to the Agent Skill standard.',
-    repair_tokens: ['# Skill Documentation and Instructions'],
+    action: 'REWRITE_BLOCK',
+    description: 'Ensure skill adheres to schema specifications and OWASP agentic boundaries.',
+    repair_tokens: ['# Verify skill name, description, and input schema definitions'],
   };
 }

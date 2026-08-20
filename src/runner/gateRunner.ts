@@ -1,154 +1,136 @@
-import { spawnSync } from 'node:child_process';
+/**
+ * @file src/runner/gateRunner.ts
+ * @description Execution engine for mechanical gate stages (post-edit, pre-commit, pre-push).
+ *
+ * Runs stage-specific linters, formatters, and scanners, parses failure streams,
+ * and emits structured LSP Diagnostic Envelopes with exit codes.
+ */
+
 import * as path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import type { DiagnosticEnvelope, GateStage } from '../types/index.js';
-import { DiagnosticStreamer } from '../formatter/diagnosticStream.js';
-import { detectStack } from '../detector/stackDetector.js';
+import { DiagnosticStreamer, type ToolExecutionResult } from '../formatter/diagnosticStream.js';
 
-export interface RunOptions {
-  stage: GateStage | 'pre-commit' | 'pre-push' | 'post-edit';
-  filePath?: string;
+/**
+ * Options for configuring GateRunner execution
+ */
+export interface GateRunnerOptions {
+  /** Target working directory (defaults to process.cwd()) */
   cwd?: string;
-  jsonOutput?: boolean;
+  /** Custom environment variables */
+  env?: NodeJS.ProcessEnv;
 }
 
-export interface RunResult {
-  passed: boolean;
-  exitCode: number;
-  envelope: DiagnosticEnvelope;
-  rawOutput: string;
-}
-
+/**
+ * Stage Execution Engine for Mechanical Hard Gates.
+ */
 export class GateRunner {
+  /** Resolved absolute path of the target repository */
   private readonly rootPath: string;
+  /** Environment variables passed to child processes */
+  private readonly env: NodeJS.ProcessEnv;
 
-  constructor(cwd: string = process.cwd()) {
-    this.rootPath = path.resolve(cwd);
+  /**
+   * Initialize a new GateRunner instance
+   * @param options Runner configuration options
+   */
+  constructor(options: GateRunnerOptions = {}) {
+    this.rootPath = path.resolve(options.cwd || process.cwd());
+    this.env = { ...process.env, ...options.env };
   }
 
   /**
-   * Execute gate for a given stage
+   * Execute Stage 1: PostFileEdit tool interceptor on a single modified file.
+   * Runs in < 300ms on ASTs using Biome, Ruff, or SkillCheck.
+   *
+   * @param filePath Relative or absolute path of the modified file
+   * @returns DiagnosticEnvelope detailing formatting/linting findings
    */
-  public run(options: RunOptions): RunResult {
+  public runPostEdit(filePath: string): DiagnosticEnvelope {
     const startTime = Date.now();
-    const stage = this.normalizeStage(options.stage);
-
-    if (stage === 'PostFileEdit' && options.filePath) {
-      return this.runPostFileEdit(options.filePath, startTime);
-    }
-
-    if (stage === 'PrePush') {
-      return this.runPrePush(startTime);
-    }
-
-    return this.runPreCommit(startTime);
-  }
-
-  private runPostFileEdit(filePath: string, startTime: number): RunResult {
     const fullPath = path.resolve(this.rootPath, filePath);
-    const detection = detectStack(this.rootPath);
-    const results: Array<{ toolName: string; output: string; exitCode: number }> = [];
+    const ext = path.extname(fullPath).toLowerCase();
+    const toolResults: ToolExecutionResult[] = [];
 
-    if (/\.(js|ts|jsx|tsx|json|jsonc)$/.test(filePath) && detection.jsTs.detected) {
-      const res = this.execCommand('npx', ['biome', 'check', '--write', fullPath]);
-      results.push({ toolName: 'biome', output: res.stdout + res.stderr, exitCode: res.status ?? 0 });
+    // JS/TS: Run Biome check with auto-write
+    if (['.js', '.ts', '.jsx', '.tsx', '.json', '.jsonc'].includes(ext)) {
+      const res = this.execCommand('npx', ['@biomejs/biome', 'check', '--write', fullPath]);
+      toolResults.push({ toolName: 'biome', output: res.output, exitCode: res.exitCode });
     }
 
-    if (/\.py$/.test(filePath) && detection.python.detected) {
+    // Python: Run Ruff check with auto-fix
+    if (['.py'].includes(ext)) {
       const res = this.execCommand('ruff', ['check', '--fix', fullPath]);
-      results.push({ toolName: 'ruff', output: res.stdout + res.stderr, exitCode: res.status ?? 0 });
+      toolResults.push({ toolName: 'ruff', output: res.output, exitCode: res.exitCode });
     }
 
-    if (filePath.includes('.claude/skills/') || filePath.endsWith('SKILL.md')) {
+    // Skill markdown: Run skillcheck validator
+    if (fullPath.includes('.claude/skills') || fullPath.endsWith('SKILL.md')) {
       const res = this.execCommand('skillcheck', ['check', fullPath]);
-      results.push({ toolName: 'skillcheck', output: res.stdout + res.stderr, exitCode: res.status ?? 0 });
+      toolResults.push({ toolName: 'skillcheck', output: res.output, exitCode: res.exitCode });
     }
 
     const duration = Date.now() - startTime;
-    const envelope = DiagnosticStreamer.aggregate(results, {
+    return DiagnosticStreamer.aggregate(toolResults, {
       stage: 'PostFileEdit',
       executionTimeMs: duration,
     });
-
-    const passed = envelope.summary.total_errors === 0;
-    const combinedOutput = results.map(r => r.output).join('\n');
-
-    return {
-      passed,
-      exitCode: passed ? 0 : 1,
-      envelope,
-      rawOutput: combinedOutput,
-    };
   }
 
-  private runPreCommit(startTime: number): RunResult {
-    // Attempt running lefthook pre-commit
-    const lefthookRes = this.execCommand('npx', ['lefthook', 'run', 'pre-commit']);
-    const rawOutput = (lefthookRes.stdout || '') + (lefthookRes.stderr || '');
+  /**
+   * Execute Stage 2: Synchronous Local Pre-Commit Hard Gate (< 2.0s target).
+   * Invokes Lefthook to run parallel staged checks (Biome, Ruff, AISlop, TruffleHog, Typos, Actionlint).
+   *
+   * @returns DiagnosticEnvelope aggregating all staged failure diagnostics
+   */
+  public runPreCommit(): DiagnosticEnvelope {
+    const startTime = Date.now();
+    const res = this.execCommand('npx', ['lefthook', 'run', 'pre-commit']);
     const duration = Date.now() - startTime;
 
-    const envelope = DiagnosticStreamer.format(rawOutput, {
-      stage: 'PreCommit',
-      toolName: 'lefthook',
-      executionTimeMs: duration,
-    });
-
-    const passed = (lefthookRes.status === 0) && envelope.summary.total_errors === 0;
-
-    return {
-      passed,
-      exitCode: passed ? 0 : (lefthookRes.status || 1),
-      envelope,
-      rawOutput,
-    };
+    return DiagnosticStreamer.aggregate(
+      [{ toolName: 'lefthook-pre-commit', output: res.output, exitCode: res.exitCode }],
+      { stage: 'PreCommit', executionTimeMs: duration }
+    );
   }
 
-  private runPrePush(startTime: number): RunResult {
-    const lefthookRes = this.execCommand('npx', ['lefthook', 'run', 'pre-push']);
-    const rawOutput = (lefthookRes.stdout || '') + (lefthookRes.stderr || '');
+  /**
+   * Execute Stage 3: Pre-Push / CI Full Codebase Graph Governance.
+   * Invokes Lefthook to run pre-push checks (Fallow, Sherif, OWASP Noir).
+   *
+   * @returns DiagnosticEnvelope aggregating graph audit results
+   */
+  public runPrePush(): DiagnosticEnvelope {
+    const startTime = Date.now();
+    const res = this.execCommand('npx', ['lefthook', 'run', 'pre-push']);
     const duration = Date.now() - startTime;
 
-    const envelope = DiagnosticStreamer.format(rawOutput, {
-      stage: 'PrePush',
-      toolName: 'lefthook',
-      executionTimeMs: duration,
-    });
-
-    const passed = (lefthookRes.status === 0) && envelope.summary.total_errors === 0;
-
-    return {
-      passed,
-      exitCode: passed ? 0 : (lefthookRes.status || 1),
-      envelope,
-      rawOutput,
-    };
+    return DiagnosticStreamer.aggregate(
+      [{ toolName: 'lefthook-pre-push', output: res.output, exitCode: res.exitCode }],
+      { stage: 'PrePush', executionTimeMs: duration }
+    );
   }
 
-  private execCommand(command: string, args: string[]) {
+  /**
+   * Helper to spawn a shell command synchronously and capture output
+   */
+  private execCommand(command: string, args: string[]): { exitCode: number; output: string } {
     try {
-      return spawnSync(command, args, {
+      const proc = spawnSync(command, args, {
         cwd: this.rootPath,
+        env: this.env,
         encoding: 'utf-8',
-        stdio: 'pipe',
-        timeout: 30000,
+        shell: process.platform === 'win32',
       });
+
+      const stdout = proc.stdout || '';
+      const stderr = proc.stderr || '';
+      const output = `${stdout}\n${stderr}`.trim();
+      const exitCode = proc.status ?? (proc.error ? 1 : 0);
+
+      return { exitCode, output };
     } catch (err: any) {
-      return {
-        status: 1,
-        stdout: '',
-        stderr: err?.message || String(err),
-      };
+      return { exitCode: 1, output: err.message || 'Execution failed' };
     }
   }
-
-  private normalizeStage(stage: string): GateStage {
-    const s = stage.toLowerCase().replace(/[^a-z]/g, '');
-    if (s.includes('post') || s.includes('edit')) return 'PostFileEdit';
-    if (s.includes('push')) return 'PrePush';
-    if (s.includes('ci')) return 'CI';
-    return 'PreCommit';
-  }
-}
-
-export function runGate(options: RunOptions): RunResult {
-  return new GateRunner(options.cwd).run(options);
 }

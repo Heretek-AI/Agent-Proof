@@ -1,4 +1,14 @@
 #!/usr/bin/env node
+/**
+ * @file scripts/verify-real-repo.mjs
+ * @description Real-world sandbox lifecycle verification test script.
+ *
+ * Simulates a realistic multi-stack polyglot repository (TypeScript, Python,
+ * GitHub Workflows, Docker, Claude Skills), initializes mechanical hard gates,
+ * tests permission locking, injects deliberate AI anti-patterns, asserts sub-second
+ * gate interception with repair tokens, and validates autonomous self-correction.
+ */
+
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -11,7 +21,7 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 const binPath = path.join(rootDir, 'bin', 'agent-proof.js');
 
-// ANSI Color Helpers
+// ANSI Color Helpers for Terminal Output
 const cyan = (t) => `\x1b[36m${t}\x1b[0m`;
 const green = (t) => `\x1b[32m${t}\x1b[0m`;
 const red = (t) => `\x1b[31m${t}\x1b[0m`;
@@ -22,12 +32,16 @@ console.log(bold(cyan('\n======================================================'
 console.log(bold(cyan(' 🛡️  Agent-Proof Real-World Live Sandbox Verification ')));
 console.log(bold(cyan('======================================================\n')));
 
+// Create isolated temporary sandbox directory
 const sandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-proof-real-repo-'));
 console.log(`📁 Sandbox Repository: ${bold(sandboxDir)}\n`);
 
+/**
+ * Clean up temporary sandbox directory on exit
+ */
 function cleanup() {
   try {
-    // Unlock files before removing
+    // Unlock files before attempting directory deletion
     execFileSync(process.execPath, [binPath, 'unlock', sandboxDir], { stdio: 'ignore' });
   } catch {}
   try {
@@ -38,6 +52,9 @@ function cleanup() {
 process.on('exit', cleanup);
 process.on('SIGINT', () => { cleanup(); process.exit(1); });
 
+/**
+ * Helper to run a numbered verification step and measure elapsed time
+ */
 async function runStep(stepNumber, title, fn) {
   console.log(bold(`[Step ${stepNumber}/6] ${title}...`));
   const start = Date.now();
@@ -57,7 +74,7 @@ async function runStep(stepNumber, title, fn) {
 // STEP 1: Populate Sandbox with Multi-Stack Polyglot Repository
 // -----------------------------------------------------------------------------
 await runStep(1, 'Creating Real-World Multi-Stack Project', async () => {
-  // Initialize git repo
+  // Initialize git repository
   execFileSync('git', ['init', sandboxDir], { stdio: 'pipe' });
   execFileSync('git', ['-C', sandboxDir, 'config', 'user.name', 'Agent Tester'], { stdio: 'pipe' });
   execFileSync('git', ['-C', sandboxDir, 'config', 'user.email', 'tester@heretek.ai'], { stdio: 'pipe' });
@@ -145,7 +162,7 @@ await runStep(2, 'Running `npx @heretek-ai/agent-proof init`', async () => {
 
   console.log(initOutput.split('\n').map(l => `     ${l}`).join('\n'));
 
-  // Assert expected configs exist
+  // Assert expected configuration files exist on disk
   const expectedFiles = [
     'lefthook.yml',
     '.claude/hooks.json',
@@ -164,13 +181,13 @@ await runStep(2, 'Running `npx @heretek-ai/agent-proof init`', async () => {
     }
   }
 
-  // Validate lefthook.yml content
+  // Validate lefthook.yml content contains multi-stack engines
   const lefthookContent = fs.readFileSync(path.join(sandboxDir, 'lefthook.yml'), 'utf-8');
   if (!lefthookContent.includes('biome-check') || !lefthookContent.includes('ruff-check') || !lefthookContent.includes('aislop-scan')) {
     throw new Error('lefthook.yml is missing required multi-stack engines');
   }
 
-  // Validate .claude/hooks.json
+  // Validate .claude/hooks.json contains Stage 1 hooks
   const hooksJson = JSON.parse(fs.readFileSync(path.join(sandboxDir, '.claude/hooks.json'), 'utf-8'));
   if (!hooksJson.hooks?.PostFileEdit || !hooksJson.hooks?.PreCommit) {
     throw new Error('.claude/hooks.json is missing PostFileEdit or PreCommit hooks');
@@ -189,7 +206,7 @@ await runStep(3, 'Verifying Governance Permission Lock-in (chmod 0444)', async (
     throw new Error(`.claude/hooks.json is writable! Expected read-only permissions (0444).`);
   }
 
-  // Test status command
+  // Test status CLI command
   const statusOutput = execFileSync(process.execPath, [binPath, 'status', sandboxDir], {
     encoding: 'utf-8',
   });
@@ -197,7 +214,7 @@ await runStep(3, 'Verifying Governance Permission Lock-in (chmod 0444)', async (
     throw new Error(`Governance status check failed:\n${statusOutput}`);
   }
 
-  // Attempt unauthorized agent write
+  // Attempt unauthorized agent write and assert failure
   try {
     fs.writeFileSync(hooksPath, '{"tampered": true}');
     throw new Error('Unauthorized agent write succeeded on locked file!');

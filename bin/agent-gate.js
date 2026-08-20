@@ -1,123 +1,90 @@
 #!/usr/bin/env node
-'use strict';
-
-const { execFileSync } = require('node:child_process');
-const fs = require('node:fs');
-const path = require('node:path');
-
 /**
- * Platform-Specific Zero-Dependency Binary Launcher
- * Directly delegates execution to native architecture binary when available,
- * or seamlessly falls back to bundled JavaScript CLI engine.
+ * @file bin/agent-gate.js
+ * @description Zero-dependency platform-specific binary launcher with JS fallback.
+ *
+ * Execution Resolution Flow:
+ * 1. Checks for native compiled architecture binary in optionalDependencies
+ *    (@heretek-ai/binary-*, @agent-proof/binary-*, @agent-gate/binary-*).
+ * 2. If present, delegates directly via `execFileSync` without invoking npm.
+ * 3. Otherwise, falls back to executing the bundled JavaScript CLI in `dist/cli.js`.
  */
 
-const PLATFORM_MAP = {
-  darwin: 'darwin',
-  linux: 'linux',
-  win32: 'win32',
-};
+'use strict';
 
-const ARCH_MAP = {
-  x64: 'x64',
-  arm64: 'arm64',
-};
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
-function getNativeBinaryPath() {
-  const platform = PLATFORM_MAP[process.platform];
-  const arch = ARCH_MAP[process.arch];
+// Determine current OS platform and CPU architecture
+const platform = process.platform;
+const arch = process.arch;
 
-  if (!platform || !arch) {
-    return null;
-  }
+// Binary package naming candidates
+const packageNames = [
+  `@heretek-ai/binary-${platform}-${arch}`,
+  `@agent-proof/binary-${platform}-${arch}`,
+  `@agent-gate/binary-${platform}-${arch}`,
+];
 
-  const binaryNames = platform === 'win32'
-    ? ['agent-proof.exe', 'agent-gate.exe']
-    : ['agent-proof', 'agent-gate'];
+// Binary executable filename
+const binaryName = platform === 'win32' ? 'agent-proof.exe' : 'agent-proof';
 
-  const packageNames = [
-    `@heretek-ai/binary-${platform}-${arch}`,
-    `@agent-proof/binary-${platform}-${arch}`,
-    `@agent-gate/binary-${platform}-${arch}`,
-  ];
+let nativeBinaryPath = null;
 
-  for (const packageName of packageNames) {
-    for (const binaryName of binaryNames) {
-      const candidates = [
-        // 1. Direct optionalDependency in node_modules
-        path.join(__dirname, '..', 'node_modules', packageName, 'bin', binaryName),
-        // 2. Hoisted node_modules (monorepo / global)
-        path.join(__dirname, '..', '..', packageName, 'bin', binaryName),
-        // 3. Local architecture build directory
-        path.join(__dirname, 'native', `${platform}-${arch}`, binaryName),
-      ];
-
-      for (const candidate of candidates) {
-        try {
-          if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-            return candidate;
-          }
-        } catch {
-          // ignore stat errors
-        }
-      }
+// Search for native binary across candidate package names
+for (const pkg of packageNames) {
+  try {
+    const pkgPath = require.resolve(`${pkg}/package.json`);
+    const binDir = path.dirname(pkgPath);
+    const candidatePath = path.join(binDir, 'bin', binaryName);
+    if (fs.existsSync(candidatePath)) {
+      nativeBinaryPath = candidatePath;
+      break;
     }
+  } catch {
+    // Package not installed in node_modules, continue searching
   }
-
-  return null;
 }
 
-function launch() {
-  const nativeBinary = getNativeBinaryPath();
-  const args = process.argv.slice(2);
-
-  if (nativeBinary) {
-    try {
-      execFileSync(nativeBinary, args, {
-        stdio: 'inherit',
-        env: process.env,
-      });
-      process.exit(0);
-    } catch (err) {
-      if (err.status !== undefined && err.status !== null) {
-        process.exit(err.status);
-      } else if (err.signal) {
-        process.kill(process.pid, err.signal);
-      } else {
-        console.error(`[agent-proof] Native binary execution failed: ${err.message}`);
-        process.exit(1);
-      }
+// Delegate execution
+if (nativeBinaryPath) {
+  // Execute native compiled binary directly
+  try {
+    execFileSync(nativeBinaryPath, process.argv.slice(2), {
+      stdio: 'inherit',
+      env: process.env,
+    });
+  } catch (err) {
+    if (err.status !== undefined) {
+      process.exit(err.status);
     }
-  } else {
-    // Fallback to bundled JavaScript CLI engine
-    const distCli = path.join(__dirname, '..', 'dist', 'cli.js');
-    const distCliCjs = path.join(__dirname, '..', 'dist', 'cli.cjs');
+    console.error(`Failed to execute native binary at ${nativeBinaryPath}:`, err.message);
+    process.exit(1);
+  }
+} else {
+  // Fall back to JavaScript CLI implementation in dist/
+  const cliCjs = path.join(__dirname, '..', 'dist', 'cli.js');
+  const cliMjs = path.join(__dirname, '..', 'dist', 'cli.mjs');
 
-    if (fs.existsSync(distCliCjs)) {
-      try {
-        const { runCli } = require(distCliCjs);
-        runCli(args).then(code => process.exit(code ?? 0)).catch(err => {
-          console.error(err);
-          process.exit(1);
-        });
-      } catch (err) {
-        console.error(`[agent-proof] JS fallback failed: ${err.message}`);
-        process.exit(1);
-      }
-    } else if (fs.existsSync(distCli)) {
-      import(distCli).then(({ runCli }) => {
-        return runCli(args);
-      }).then(code => {
-        process.exit(code ?? 0);
-      }).catch(err => {
-        console.error(`[agent-proof] JS fallback failed: ${err.message}`);
-        process.exit(1);
-      });
-    } else {
-      console.error('[agent-proof] Error: Neither native binary nor built dist/cli.js was found.');
-      console.error('Please run `npm run build` first.');
+  if (fs.existsSync(cliCjs)) {
+    const { main } = require(cliCjs);
+    main(process.argv.slice(2)).catch(err => {
+      console.error(err);
       process.exit(1);
-    }
+    });
+  } else if (fs.existsSync(cliMjs)) {
+    import(cliMjs).then(({ main }) => {
+      main(process.argv.slice(2)).catch(err => {
+        console.error(err);
+        process.exit(1);
+      });
+    }).catch(err => {
+      console.error('Failed to load CLI bundle:', err);
+      process.exit(1);
+    });
+  } else {
+    console.error('Error: Neither native binary nor bundled CLI found. Please run `npm run build`.');
+    process.exit(1);
   }
 }
-
-launch();

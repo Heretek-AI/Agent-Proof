@@ -1,3 +1,14 @@
+/**
+ * @file src/generator/templates/aislop.ts
+ * @description Generates the .aislop/config.yml configuration for deterministic AI slop detection.
+ */
+
+/**
+ * Generate an AISlop configuration defining deterministic rules against
+ * swallowed errors, empty catch blocks, hallucinated imports, and unsafe type casts.
+ *
+ * @returns Formatted YAML string for .aislop/config.yml
+ */
 export function generateAislopConfig(): string {
   return `# AISlop Configuration for Deterministic AI Code Smell & Slop Detection
 version: "1.0"

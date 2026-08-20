@@ -1,3 +1,8 @@
+/**
+ * @file src/generator/index.ts
+ * @description Exports configuration generators and templates.
+ */
+
 export * from './configGenerator.js';
 export * from './templates/lefthook.js';
 export * from './templates/claudeHooks.js';

@@ -1,3 +1,14 @@
+/**
+ * @file src/generator/templates/biome.ts
+ * @description Generates the biome.json configuration for sub-millisecond JS/TS linting and formatting.
+ */
+
+/**
+ * Generate a standard, high-performance Biome configuration with strict rules against
+ * common AI-generated anti-patterns (noExplicitAny, noDebugger, noVar).
+ *
+ * @returns Formatted JSON string for biome.json
+ */
 export function generateBiomeConfig(): string {
   const config = {
     $schema: 'https://biomejs.dev/schemas/1.9.4/schema.json',

@@ -1,122 +1,111 @@
+/**
+ * @file src/formatter/parsers/biome.ts
+ * @description Biome output parser for JS/TS linter and formatter diagnostics.
+ */
+
 import type { DiagnosticItem } from '../../types/index.js';
 import { stripAnsi } from '../ansi.js';
 
+/**
+ * Parse raw stdout/stderr from `biome check` into structured DiagnosticItems.
+ * Supports both Biome JSON output and human-readable CLI terminal diagnostics.
+ *
+ * @param rawOutput Raw terminal output from Biome
+ * @returns Array of DiagnosticItem objects with rule IDs and repair tokens
+ */
 export function parseBiomeOutput(rawOutput: string): DiagnosticItem[] {
   const clean = stripAnsi(rawOutput);
   const diagnostics: DiagnosticItem[] = [];
 
-  // Check if JSON output
+  // 1. Check if output is Biome JSON format
   if (clean.trim().startsWith('{')) {
     try {
-      const data = JSON.parse(clean);
-      if (data.diagnostics && Array.isArray(data.diagnostics)) {
-        for (const diag of data.diagnostics) {
+      const parsed = JSON.parse(clean);
+      if (parsed.diagnostics && Array.isArray(parsed.diagnostics)) {
+        for (const diag of parsed.diagnostics) {
           const filePath = diag.location?.path?.file || 'unknown';
-          const startLine = diag.location?.span?.start?.line || 1;
-          const startCol = diag.location?.span?.start?.column || 1;
-          const endLine = diag.location?.span?.end?.line || startLine;
-          const endCol = diag.location?.span?.end?.column || startCol;
-          const ruleId = diag.category || 'biome/lint';
-          const message = diag.description || diag.message || 'Biome lint violation';
+          const line = diag.location?.span?.[0] ? 1 : (diag.location?.start?.line || 1);
+          const col = diag.location?.start?.column || 1;
+          const ruleId = diag.category || 'biome-lint';
+          const message = diag.description || (diag.message && diag.message[0]?.text) || 'Biome lint violation';
+          const severity = diag.severity === 'error' || diag.severity === 'fatal' ? 'ERROR' : 'WARNING';
 
           diagnostics.push({
             source: 'biome',
             rule_id: ruleId,
-            severity: diag.severity === 'warning' ? 'WARNING' : 'ERROR',
+            severity,
             file_path: filePath,
             range: {
-              start: { line: startLine, column: startCol },
-              end: { line: endLine, column: endCol },
+              start: { line, column: col },
+              end: { line, column: col + 20 },
             },
             error_message: message,
-            repair_instruction: generateBiomeRepair(ruleId, message),
+            repair_instruction: generateBiomeRepair(ruleId, filePath),
           });
         }
         if (diagnostics.length > 0) return diagnostics;
       }
     } catch {
-      // Continue to regex
+      // Continue to regex parser if JSON parsing fails
     }
   }
 
-  // Regex parsing for Biome text output
-  // Example:
-  // src/index.ts:12:5 lint/suspicious/noExplicitAny ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  //   ✖ Avoid using any.
+  // 2. Regex parser for Biome standard CLI terminal output
   const lines = clean.split('\n');
-  let currentDiag: Partial<DiagnosticItem> | null = null;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const headerMatch = line.match(/^([^\s:]+):(\d+):(\d+)\s+([a-zA-Z0-9_\-\/]+)/);
-    if (headerMatch) {
-      if (currentDiag && currentDiag.file_path) {
-        diagnostics.push(currentDiag as DiagnosticItem);
+
+    // Pattern: filePath:line:col lint/suspicious/noExplicitAny ━━━━━━━━━━━━━
+    const match = line.match(/^([^\s:]+):(\d+):(\d+)\s+([a-zA-Z0-9_\-\/]+)/);
+    if (match) {
+      const [, filePath, lineStr, colStr, ruleId] = match;
+      let errorMsg = 'Biome lint violation';
+
+      // Look ahead for the error description on subsequent lines
+      for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+        const nextLine = lines[j].trim();
+        if (nextLine.startsWith('✖') || nextLine.startsWith('!') || nextLine.startsWith('i')) {
+          errorMsg = nextLine.replace(/^[✖!i]\s*/, '').trim();
+          break;
+        }
       }
 
-      const [, filePath, lineStr, colStr, ruleId] = headerMatch;
-      const lineNum = parseInt(lineStr, 10);
-      const colNum = parseInt(colStr, 10);
-
-      currentDiag = {
+      diagnostics.push({
         source: 'biome',
         rule_id: ruleId,
-        severity: ruleId.includes('warn') ? 'WARNING' : 'ERROR',
+        severity: 'ERROR',
         file_path: filePath,
         range: {
-          start: { line: lineNum, column: colNum },
-          end: { line: lineNum, column: colNum + 10 },
+          start: { line: parseInt(lineStr, 10), column: parseInt(colStr, 10) },
+          end: { line: parseInt(lineStr, 10), column: parseInt(colStr, 10) + 20 },
         },
-        error_message: '',
-      };
-      continue;
+        error_message: errorMsg,
+        repair_instruction: generateBiomeRepair(ruleId, filePath),
+      });
     }
-
-    if (currentDiag && (line.includes('✖') || line.includes('error:') || line.includes('warn:'))) {
-      const msg = line.replace(/^[✖\s]+/, '').trim();
-      currentDiag.error_message = msg;
-      currentDiag.repair_instruction = generateBiomeRepair(currentDiag.rule_id || '', msg);
-    }
-  }
-
-  if (currentDiag && currentDiag.file_path) {
-    if (!currentDiag.error_message) currentDiag.error_message = 'Biome lint or format violation';
-    if (!currentDiag.repair_instruction) currentDiag.repair_instruction = generateBiomeRepair(currentDiag.rule_id || '');
-    diagnostics.push(currentDiag as DiagnosticItem);
   }
 
   return diagnostics;
 }
 
-function generateBiomeRepair(ruleId: string, message: string = ''): DiagnosticItem['repair_instruction'] {
+/**
+ * Generate actionable repair instructions for Biome rules
+ */
+function generateBiomeRepair(ruleId: string, filePath: string): DiagnosticItem['repair_instruction'] {
   if (ruleId.includes('noExplicitAny')) {
     return {
       action: 'REPLACE_TOKEN',
-      description: 'Replace `any` with `unknown` or a specific typed interface.',
-      repair_tokens: ['unknown', 'Record<string, unknown>'],
-    };
-  }
-
-  if (ruleId.includes('noUnusedVariables') || ruleId.includes('noUnusedImports')) {
-    return {
-      action: 'DELETE_LINE',
-      description: 'Remove unused variable or import.',
-      repair_tokens: ['// Remove unused identifier'],
-    };
-  }
-
-  if (ruleId.includes('useConst')) {
-    return {
-      action: 'REPLACE_TOKEN',
-      description: 'Use `const` instead of `let` or `var` for variables that are never reassigned.',
-      repair_tokens: ['const '],
+      description: 'Replace `any` with `unknown` or a specific TypeScript interface / type guard.',
+      repair_tokens: ['unknown', 'type SafePayload = Record<string, unknown>;'],
+      suggested_command: `npx @biomejs/biome check --write ${filePath}`,
     };
   }
 
   return {
     action: 'EXECUTE_COMMAND',
-    description: `Run biome check --write to automatically apply safe fixes.`,
-    suggested_command: 'npx biome check --write ${filePath}',
-    repair_tokens: ['npx biome check --write'],
+    description: `Run Biome automated fix or format: npx @biomejs/biome check --write ${filePath}`,
+    repair_tokens: [`npx @biomejs/biome check --write ${filePath}`],
+    suggested_command: `npx @biomejs/biome check --write ${filePath}`,
   };
 }
