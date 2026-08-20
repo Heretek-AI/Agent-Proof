@@ -27,18 +27,22 @@ npm run build
 npm run typecheck
 ```
 
-### 2. Testing
+### 2. Testing & Verification
 ```bash
 # Run unit & integration test suites
 npm test
 
 # Run real-world sandbox lifecycle test
 npm run test:real-repo
+
+# Run automated real-world E2E test on Heretek-AI/drop
+npm run test:e2e-drop
 ```
 
 ### 3. Publishing & CI/CD
 - GitHub Actions workflow [`.github/workflows/publish.yml`](file:///home/john/Projects/Agent-Proof/.github/workflows/publish.yml) uses **Trusted Publishing (OIDC)** with `id-token: write` and npm provenance.
-- Publishing is triggered by creating a GitHub Release or pushing a version tag (`v*.*.*`).
+- Publishing is triggered by creating a GitHub Release, pushing a version tag (`v*.*.*`), or manual `workflow_dispatch`.
+- Version resolution queries the NPM registry and automatically increments the patch version to prevent `EPUBLISHCONFLICT`.
 
 ---
 
@@ -55,6 +59,7 @@ npm run test:real-repo
 | **Runner** | [`src/runner/gateRunner.ts`](file:///home/john/Projects/Agent-Proof/src/runner/gateRunner.ts) | Gate stage runner for `post-edit`, `pre-commit`, `pre-push` |
 | **CLI** | [`src/cli.ts`](file:///home/john/Projects/Agent-Proof/src/cli.ts) | Command dispatcher (`init`, `detect`, `run`, `lock`, `unlock`, `status`) |
 | **Launcher** | [`bin/agent-proof.js`](file:///home/john/Projects/Agent-Proof/bin/agent-proof.js) | Native binary resolution with JS fallback |
+| **E2E Runner** | [`scripts/e2e-real-repo-runner.mjs`](file:///home/john/Projects/Agent-Proof/scripts/e2e-real-repo-runner.mjs) | Real-world drop repo lifecycle runner with LLM secrets |
 
 ---
 

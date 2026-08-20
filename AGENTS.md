@@ -41,10 +41,11 @@ Agent-Proof/
 │   ├── agent-proof.js          # Primary CLI launcher with optionalDependencies resolution
 │   └── agent-gate.js           # Compatibility alias launcher
 ├── src/                        # TypeScript source code
-│   ├── detector/               # Multi-stack auto-detection engine
-│   ├── generator/              # Multi-tier configuration generator & templates
-│   ├── formatter/              # ANSI-stripper & LSP diagnostic streaming engine
-│   ├── installer/              # Git hook installer & POSIX permission lock-in
+│   ├── detector/               # Multi-stack auto-detection engine (JS/TS, Python, Go, Rust, C/C++, C#, Java, Ruby, Elixir)
+│   ├── generator/              # Multi-tier configuration generator & templates (Lefthook, Biome, Ruff, Claude Hooks, AISlop)
+│   ├── formatter/              # ANSI-stripper & LSP diagnostic streaming engine (LSIF schema compliant)
+│   │   └── parsers/            # Specialized tool parsers (aislop, biome, ruff, skillcheck, trufflehog, typos, actionlint)
+│   ├── installer/              # Git hook installer & POSIX permission lock-in (chmod 0444)
 │   ├── runner/                 # Mechanical gate stage execution runner
 │   ├── types/                  # TypeScript interfaces and schema types
 │   ├── cli.ts                  # Command-line interface dispatcher
@@ -57,10 +58,12 @@ Agent-Proof/
 │   ├── lockin.test.ts          # Git hook & permission locking tests
 │   └── e2e.test.ts             # End-to-end repository initialization test
 ├── scripts/                    # Development & verification scripts
-│   └── verify-real-repo.mjs    # Real-world sandbox lifecycle validation script
+│   ├── verify-real-repo.mjs    # Real-world sandbox lifecycle validation script
+│   └── e2e-real-repo-runner.mjs# Automated E2E test harness driving Heretek-AI/drop & Claude Code
 ├── .github/workflows/          # GitHub Actions CI/CD
 │   ├── ci.yml                  # Continuous integration test runner
-│   └── publish.yml             # Trusted publishing (OIDC) to npm
+│   ├── e2e-drop.yml            # Real-world Drop repository E2E validation with LLM secrets
+│   └── publish.yml             # OpenID Connect (OIDC) Trusted Publishing to npm with auto-incrementation
 ├── package.json                # Package definition, scripts, optionalDependencies matrix
 ├── tsconfig.json               # Strict NodeNext TypeScript configuration
 └── tsup.config.ts              # Bundle configuration for dual CJS/ESM distribution
@@ -82,6 +85,9 @@ npm run typecheck
 
 # Run real-world sandbox lifecycle validation
 npm run test:real-repo
+
+# Run full automated E2E test against Heretek-AI/drop
+npm run test:e2e-drop
 
 # Test CLI commands locally
 node bin/agent-proof.js --help

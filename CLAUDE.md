@@ -19,6 +19,9 @@ npm run typecheck
 # Run real-world sandbox verification script
 npm run test:real-repo
 
+# Run full automated E2E test against Heretek-AI/drop
+npm run test:e2e-drop
+
 # Test CLI locally
 node bin/agent-proof.js --version
 node bin/agent-proof.js init
@@ -33,7 +36,7 @@ node bin/agent-proof.js status
 Agent-Proof is structured into modular components:
 
 1. **Stack Detector (`src/detector/stackDetector.ts`)**:
-   - Inspects target repository indicators (JS/TS, Python, Go, Rust, GitHub Workflows, Docker, Claude Agent Harness).
+   - Inspects target repository indicators (JS/TS, Python, Go, Rust, C/C++, C#, Java, Ruby, Elixir, GitHub Workflows, Docker, Claude Agent Harness).
 2. **Config Generator (`src/generator/configGenerator.ts`)**:
    - Generates `lefthook.yml`, `.claude/hooks.json`, `biome.json`, `ruff.toml`, and `.aislop/config.yml`.
 3. **Diagnostic Streamer (`src/formatter/diagnosticStream.ts`)**:

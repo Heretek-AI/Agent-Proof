@@ -1,25 +1,32 @@
 # @heretek-ai/agent-proof 🔒
 
-> **Mechanical Hard-Gate for AI Coding Agents** — Zero-dependency architecture for deterministic AI code governance and sub-second pre-commit gates.
+> **Mechanical Hard-Gate for Autonomous AI Coding Agents** — Zero-dependency multi-tier code governance, sub-second post-edit interceptors, pre-commit gates, and LSP diagnostic envelopes for Claude Code, Antigravity, Cursor, Codex, and Aider.
 
-[![npm version](https://img.shields.io/npm/v/@heretek-ai/agent-proof.svg)](https://www.npmjs.com/package/@heretek-ai/agent-proof)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/@heretek-ai/agent-proof.svg?style=flat-square&color=blue)](https://www.npmjs.com/package/@heretek-ai/agent-proof)
+[![CI Test Suite](https://github.com/Heretek-AI/Agent-Proof/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/Heretek-AI/Agent-Proof/actions/workflows/ci.yml)
+[![E2E Real-World Drop Test](https://github.com/Heretek-AI/Agent-Proof/actions/workflows/e2e-drop.yml/badge.svg?style=flat-square)](https://github.com/Heretek-AI/Agent-Proof/actions/workflows/e2e-drop.yml)
+[![Publish to NPM](https://github.com/Heretek-AI/Agent-Proof/actions/workflows/publish.yml/badge.svg?style=flat-square)](https://github.com/Heretek-AI/Agent-Proof/actions/workflows/publish.yml)
+[![OIDC Trusted Publishing](https://img.shields.io/badge/OIDC-Trusted%20Publishing-success?style=flat-square&logo=github)](https://docs.npmjs.com/trusted-publishers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
+[![Zero Runtime Dependencies](https://img.shields.io/badge/Dependencies-0%20Runtime-orange?style=flat-square)](package.json)
+[![Node.js Version](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-brightgreen?style=flat-square&logo=node.js)](package.json)
 
 ---
 
 ## 🎯 Executive Overview
 
-Prompt-based guardrails (`CLAUDE.md`, `.cursorrules`, `rules.md`) fail under context pressure. When autonomous AI coding agents (Claude Code, Cursor, Codex, Devin, Aider) execute tasks, they frequently produce **AI Slop**:
-- Empty catch blocks and swallowed errors
-- Hallucinated or phantom dependencies
-- Unsafe type casting (`as any`)
-- Architectural boundary drift and circular imports
+Prompt-based guardrails (`CLAUDE.md`, `.cursorrules`, `rules.md`) inevitably degrade under context saturation. When autonomous AI coding agents execute multi-file refactors, they frequently introduce **AI Slop**:
+- **Swallowed Errors**: Empty catch blocks (`try { ... } catch (e) {}`) that mask production outages.
+- **Unsafe Type Casting**: `as any` or unchecked type assertions that bypass type safety.
+- **Hallucinated Dependencies**: Imports from packages not declared in `package.json` or `pyproject.toml`.
+- **Architectural Drift**: Tight coupling, circular imports, or unauthorized file modifications.
+- **Governance Tampering**: Agents weakening or deleting lint configs to bypass validation.
 
-**Agent-Proof** replaces fragile prompt instructions with **deterministic, multi-tier mechanical hard gates**: native binaries and lifecycle hooks that physically intercept agent tool calls and git operations before non-compliant code can reach version control.
+**Agent-Proof** replaces soft prompt instructions with **deterministic, multi-tier mechanical hard gates**: native binary pipelines and lifecycle interceptors that physically prevent non-compliant code from reaching version control.
 
 ---
 
-## 🏗️ Architecture & Multi-Tier Execution Harness
+## 🏗️ 3-Tier Execution Architecture
 
 ```mermaid
 flowchart TD
@@ -27,21 +34,21 @@ flowchart TD
     B -->|sub-300ms single AST| C{Biome / Ruff / SkillCheck}
     C -->|Failure| D[LSP Diagnostic Streamer\nJSON Envelope + Repair Tokens]
     D -->|Autonomous Self-Correction| A
-    C -->|Success| E[Git Stage Blobs]
+    C -->|Success| E[Git Staging Area]
     E -->|git commit| F[Stage 2: Pre-Commit Hard Gate]
     F -->|sub-2.0s parallel native| G[Lefthook Runner\nBiome + Ruff + AISlop + TruffleHog + Typos + Actionlint]
-    G -->|Commit Locked| H[Git Working Tree]
+    G -->|Commit Passed| H[Git Working Tree]
     H -->|git push / CI| I[Stage 3: CI & Codebase Graph Governance]
     I -->|Full Graph Analysis| J[Fallow Audit + Sherif + OWASP Noir]
 ```
 
-### The 3 Execution Stages
+### Execution Stage SLA Matrix
 
-| Stage | Trigger Event | Runtime Budget | Scope | Enforced Canonical Engines |
+| Stage | Trigger Event | Latency Target | Scope | Canonical Engines |
 | :--- | :--- | :--- | :--- | :--- |
-| **Stage 1: Agent Interception** | `PostFileEdit` / Tool hook | `< 300ms` | Single modified file AST | Biome (`--write`), Ruff (`--fix`), SkillCheck |
-| **Stage 2: Pre-Commit Hard Gate** | `git commit` (Pre-Commit) | `< 2.0s` | Staged git blobs (`--staged`) | Lefthook parallel: Biome, Ruff, AISlop, TruffleHog, Typos, Actionlint |
-| **Stage 3: CI & Graph Governance** | `git push` / CI Pipeline | Unconstrained | Full Codebase Graph | Fallow (dead code / arch drift), Sherif (monorepo), OWASP Noir (API attack surface) |
+| **Stage 1: Pre-Tool / Edit** | `PostFileEdit` agent hook | `< 300ms` | Single modified file AST | Biome (`--write`), Ruff (`--fix`), SkillCheck |
+| **Stage 2: Hard Git Gate** | `git commit` (Pre-Commit) | `< 2.0s` | Staged blobs (`--staged`) | Lefthook parallel: Biome, Ruff, AISlop, TruffleHog, Typos, Actionlint |
+| **Stage 3: CI & Graph Audit** | `git push` / PR Pipeline | Unconstrained | Full codebase graph | Fallow (dead code / arch drift), Sherif (monorepo), OWASP Noir (API surface) |
 
 ---
 
@@ -50,61 +57,68 @@ flowchart TD
 Initialize mechanical hard gates in any repository with zero configuration:
 
 ```bash
-# Via npx (zero-install)
+# Zero-install execution via npx
 npx @heretek-ai/agent-proof init
-# or
+
+# Alternative compatibility aliases
 npx create-agent-proof
-# or
 npx create-agent-gate
 
 # Or install globally / locally
-npm install -g @heretek-ai/agent-proof
-agent-proof init
+npm install -D @heretek-ai/agent-proof
+npx agent-proof init
 ```
 
-### CLI Commands
+### CLI Command Reference
 
-Both `agent-proof` and `agent-gate` can be used interchangeably:
+Both `agent-proof` and `agent-gate` binaries are fully supported:
 
 ```bash
-# Run multi-stack inspection and emit configurations
+# Inspect repository stack, emit configs, install git hooks, and lock permissions
 agent-proof init [directory]
 
-# Detect language stacks and agent harnesses
+# Detect language stacks and agent harnesses without modifying filesystem
 agent-proof detect [--json]
 
-# Run synchronous gates
-agent-proof run pre-commit
-agent-proof run pre-push
-agent-proof run post-edit <filePath>
+# Run mechanical gate stages directly
+agent-proof run post-edit <filePath>   # Stage 1: PostFileEdit hook (< 300ms)
+agent-proof run pre-commit            # Stage 2: Staged files hard gate (< 2.0s)
+agent-proof run pre-push              # Stage 3: Full codebase graph audit
 
-# Format raw tool stderr into LSP Diagnostic Envelope
+# Stream and format raw tool stderr into LSP Diagnostic Envelope
 cat tool_output.log | agent-proof format-diagnostics --tool aislop
 
 # Manage immutable governance permissions
-agent-proof lock
-agent-proof unlock
-agent-proof status
+agent-proof status                    # Inspect locked status (chmod 0444)
+agent-proof lock                      # Apply read-only permission lock
+agent-proof unlock                    # Temporarily unlock for admin maintenance
 ```
 
 ---
 
-## 📦 Multi-Stack Auto-Detection Matrix
+## 📦 Polyglot Multi-Stack Auto-Detection
 
-Agent-Proof automatically inspects and configures native engines for:
+Agent-Proof automatically inspects the target repository and tailors sub-second native check pipelines across polyglot ecosystems:
 
-- **JavaScript / TypeScript:** `package.json`, `tsconfig.json`, `biome.json`, `pnpm-workspace.yaml`
-- **Python:** `pyproject.toml`, `requirements.txt`, `Pipfile`, `ruff.toml`
-- **Go:** `go.mod`, `go.sum`
-- **Rust:** `Cargo.toml`, `Cargo.lock`
-- **Infra & Workflows:** `.github/workflows/*.yml`, `Dockerfile`, `docker-compose.yml`
-- **Agent Harnesses:** `.claude/`, `.cursor/`, `AGENTS.md`, `SKILL.md`, `.claude/skills/*.md`
+| Ecosystem | Detected Project Markers | Enforced Hard-Gate Engines |
+| :--- | :--- | :--- |
+| **JavaScript / TypeScript** | `package.json`, `tsconfig.json`, `pnpm-workspace.yaml`, `biome.json` | **Biome** (Formatting & Linting), **AISlop** (Anti-patterns) |
+| **Python** | `pyproject.toml`, `requirements.txt`, `Pipfile`, `ruff.toml` | **Ruff** (AST Linting & Auto-fix), **AISlop** |
+| **Go** | `go.mod`, `go.sum` | **Gosec** (Static Security Analysis) |
+| **Rust** | `Cargo.toml`, `Cargo.lock` | **Cargo Deny** (Dependency, License & Advisory Gate) |
+| **C / C++** | `CMakeLists.txt`, `Makefile`, `compile_commands.json` | **Clang-Format**, **Clang-Tidy** |
+| **C# / .NET** | `*.csproj`, `*.sln`, `global.json` | **Dotnet Format** |
+| **Java** | `pom.xml`, `build.gradle`, `build.gradle.kts` | **Checkstyle**, **SpotBugs** |
+| **Ruby** | `Gemfile`, `.rubocop.yml` | **Rubocop** |
+| **Elixir** | `mix.exs` | **Mix Credo** |
+| **Infrastructure & CI** | `.github/workflows/*.yml`, `Dockerfile` | **Actionlint**, **TruffleHog**, **Typos** |
+| **Agent Harnesses** | `.claude/`, `.cursor/`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` | **Hook Interceptors** (`PostFileEdit`, `PreCommit`) |
 
 ---
 
-## 📡 LSP Diagnostic Streamer & Repair Tokens Protocol
+## 📡 LSP Diagnostic Streamer & Autonomous Repair Tokens
 
-When a mechanical gate fails during an agent session, Agent-Proof converts raw terminal stderr into an **LSP-compliant JSON Diagnostic Envelope** enriched with concrete **`repair_tokens`** to enable autonomous self-correction loops:
+When a mechanical gate intercepts an issue, Agent-Proof converts raw terminal output into an **LSP Diagnostic Envelope** (`https://json.schemastore.org/lsif.json`) containing actionable **`repair_tokens`** so autonomous agents can self-correct deterministically:
 
 ```json
 {
@@ -121,19 +135,18 @@ When a mechanical gate fails during an agent session, Agent-Proof converts raw t
       "source": "aislop",
       "rule_id": "AI_SLOP_SWALLOWED_ERROR",
       "severity": "ERROR",
-      "file_path": "src/controllers/auth.ts",
+      "file_path": "server/utils/auth.ts",
       "range": {
-        "start": { "line": 88, "column": 7 },
-        "end": { "line": 92, "column": 8 }
+        "start": { "line": 42, "column": 5 },
+        "end": { "line": 46, "column": 6 }
       },
-      "code_snippet": "try {\n  await verifyToken(token);\n} catch (e) {}",
+      "code_snippet": "try {\n  await verifySession(token);\n} catch (e) {}",
       "error_message": "AI-Slop Pattern Detected: Empty catch block silently suppresses authentication failure.",
       "repair_instruction": {
         "action": "REWRITE_BLOCK",
-        "description": "Handle the exception explicitly. Either log the error, rethrow a custom AuthError, or return an explicit HTTP 401 Unauthorized response.",
+        "description": "Handle the exception explicitly. Either log the error, rethrow with cause, or return an explicit failure result.",
         "repair_tokens": [
-          "import { AuthException } from '../errors';",
-          "throw new AuthException('Token verification failed', { cause: e });"
+          "throw new AuthException('Session verification failed', { cause: e });"
         ]
       }
     }
@@ -143,20 +156,10 @@ When a mechanical gate fails during an agent session, Agent-Proof converts raw t
 
 ---
 
-## ⚡ Zero-Dependency Binary Packaging
+## 🛡️ Immutable Governance Permission Lock-In
 
-`@heretek-ai/agent-proof` packages platform-specific native binaries using NPM `optionalDependencies` matrix pinning:
-- Darwin (macOS): `darwin-arm64`, `darwin-x64`
-- Linux: `linux-arm64`, `linux-x64`
-- Windows: `win32-arm64`, `win32-x64`
+To prevent AI coding agents from modifying governance rules, weakening linter settings, or disabling hooks, Agent-Proof applies immutable filesystem permissions (`chmod 0444` / read-only) to:
 
-`bin/agent-proof.js` / `bin/agent-gate.js` directly delegates execution to the native binary via `execFileSync` without invoking npm or external interpreters (Python/Rust/Go).
-
----
-
-## 🛡️ Mechanical Gate Lock-in
-
-To prevent autonomous agents from modifying governance rules or removing constraints, Agent-Proof applies immutable filesystem permissions (`chmod 0444`) to:
 - `.claude/settings.json`
 - `.claude/hooks.json`
 - `lefthook.yml`
@@ -164,20 +167,50 @@ To prevent autonomous agents from modifying governance rules or removing constra
 - `ruff.toml`
 - `.aislop/config.yml`
 
+Any direct file write attempt by an agent fails immediately with `EACCES (Permission Denied)`.
+
 ---
 
-## 🧪 Testing
+## 🧪 Real-World E2E Test Suite (`Heretek-AI/drop`)
+
+Agent-Proof is continuously validated against real-world production codebases. The automated E2E test suite:
+1. Clones [`Heretek-AI/drop`](https://github.com/Heretek-AI/drop) (a full-stack Nuxt/Vue/TypeScript & Nitro game distribution platform).
+2. Initializes `@heretek-ai/agent-proof` and locks governance controls.
+3. Fetches live open issues from [`Drop-OSS/drop`](https://github.com/Drop-OSS/drop/issues).
+4. Drives Claude Code under active mechanical gate interception using organization LLM endpoints.
+5. Verifies sub-second `PostFileEdit` formatting and sub-2.0s pre-commit validation.
 
 ```bash
-# Run unit & integration test suites
+# Run real-world E2E test suite locally
+npm run test:e2e-drop
+
+# Run sandbox lifecycle validation
+npm run test:real-repo
+
+# Run full Vitest test suite
 npm test
-
-# Run type checks
-npm run typecheck
-
-# Build bundle
-npm run build
 ```
+
+---
+
+## 🤖 Multi-Agent Ecosystem Compatibility
+
+Agent-Proof integrates out of the box with all leading AI coding assistants and autonomous agents:
+
+- **Claude Code (`claude`)**: Direct lifecycle hook integration via `.claude/hooks.json` (`PostFileEdit` & `PreCommit`).
+- **Google Gemini & Antigravity**: Seamless paired programming workflow with `GEMINI.md` and MCP server integration.
+- **Cursor / Windsurf**: Parallel pre-commit hard gates and background diagnostics.
+- **Aider / Codex / Devin**: Sub-second pre-commit git gates preventing invalid commits before PR creation.
+
+---
+
+## 🔒 Security & Supply Chain Integrity
+
+- **Zero Runtime Dependencies**: Core CLI bundle compiles down to zero third-party dependencies.
+- **Trusted Publishing (OIDC)**: Published to npm via GitHub Actions OIDC Trusted Publishing with cryptographic Sigstore provenance.
+- **TOCTOU Safe**: Atomic file write flags (`wx`/`w`) preventing filesystem race conditions.
+
+---
 
 ## 📄 License
 
