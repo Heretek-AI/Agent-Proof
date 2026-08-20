@@ -1,0 +1,61 @@
+name: Publish to NPM
+
+on:
+  release:
+    types: [published]
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'NPM distribution tag (e.g. latest, beta, next)'
+        required: true
+        default: 'latest'
+      dry_run:
+        description: 'Perform dry run without publishing'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  publish:
+    name: Build & Publish to NPM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Required for npm provenance
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Verify & Build
+        run: |
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: Inspect Package Contents
+        run: npm pack --dry-run
+
+      - name: Publish to NPM Registry
+        if: ${{ !inputs.dry_run }}
+        run: npm publish --access public --provenance --tag ${{ inputs.tag || 'latest' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Dry Run Publish
+        if: ${{ inputs.dry_run }}
+        run: npm publish --dry-run --access public --tag ${{ inputs.tag || 'latest' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,72 @@
+{
+  "name": "@heretek-ai/agent-proof",
+  "version": "1.0.0",
+  "description": "Agent-Proof Mechanical Hard-Gate CLI for deterministic AI code governance",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "agent-proof": "./bin/agent-proof.js",
+    "create-agent-proof": "./bin/agent-proof.js",
+    "agent-gate": "./bin/agent-gate.js",
+    "create-agent-gate": "./bin/agent-gate.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Heretek-AI/Agent-Proof.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Heretek-AI/Agent-Proof/issues"
+  },
+  "homepage": "https://github.com/Heretek-AI/Agent-Proof#readme",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "test:real-repo": "node scripts/verify-real-repo.mjs",
+    "prepublishOnly": "npm run build && npm test && npm run typecheck",
+    "release:dry-run": "npm publish --dry-run"
+  },
+  "optionalDependencies": {
+    "@heretek-ai/binary-darwin-arm64": "1.0.0",
+    "@heretek-ai/binary-darwin-x64": "1.0.0",
+    "@heretek-ai/binary-linux-arm64": "1.0.0",
+    "@heretek-ai/binary-linux-x64": "1.0.0",
+    "@heretek-ai/binary-win32-arm64": "1.0.0",
+    "@heretek-ai/binary-win32-x64": "1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "agent-proof",
+    "agent-gate",
+    "ai-governance",
+    "pre-commit",
+    "lefthook",
+    "biome",
+    "ruff",
+    "aislop",
+    "security",
+    "code-quality"
+  ],
+  "author": "Heretek-AI",
+  "license": "MIT"
+}
