@@ -1,6 +1,6 @@
 {
   "name": "@heretek-ai/agent-proof",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Agent-Proof Mechanical Hard-Gate CLI for deterministic AI code governance",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -39,14 +39,6 @@
     "bump": "npm version patch",
     "prepublishOnly": "npm run build && npm test && npm run typecheck",
     "release:dry-run": "npm publish --dry-run"
-  },
-  "optionalDependencies": {
-    "@heretek-ai/binary-darwin-arm64": "1.0.0",
-    "@heretek-ai/binary-darwin-x64": "1.0.0",
-    "@heretek-ai/binary-linux-arm64": "1.0.0",
-    "@heretek-ai/binary-linux-x64": "1.0.0",
-    "@heretek-ai/binary-win32-arm64": "1.0.0",
-    "@heretek-ai/binary-win32-x64": "1.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",

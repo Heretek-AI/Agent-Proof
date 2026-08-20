@@ -64,23 +64,42 @@ jobs:
             TAG_VERSION="${GITHUB_REF#refs/tags/v}"
             echo "Publishing tagged release: $TAG_VERSION"
             npm version "$TAG_VERSION" --no-git-tag-version --allow-same-version
-          elif [ "${{ inputs.bump }}" = "patch" ]; then
-            npm version patch --no-git-tag-version
-          elif [ "${{ inputs.bump }}" = "minor" ]; then
-            npm version minor --no-git-tag-version
-          elif [ "${{ inputs.bump }}" = "major" ]; then
-            npm version major --no-git-tag-version
           elif [ "${{ inputs.bump }}" = "none" ]; then
             echo "Skipping version bump as requested"
           else
-            # Auto-bump: check if current version is already on NPM
-            EXISTS_ON_NPM=$(npm view "@heretek-ai/agent-proof@${CURRENT_PKG}" version 2>/dev/null || echo "")
-            if [ -n "$EXISTS_ON_NPM" ] || [ "$CURRENT_PKG" = "$LATEST_NPM" ]; then
-              echo "Version $CURRENT_PKG is already published to NPM. Auto-bumping patch..."
-              npm version patch --no-git-tag-version
-            else
-              echo "Version $CURRENT_PKG is not yet published on NPM. Proceeding with current version."
-            fi
+            TARGET_VERSION=$(node -e '
+              const currentPkg = process.argv[1];
+              const latestNpm = process.argv[2] || "0.0.0";
+              const bumpType = process.argv[3] || "auto";
+
+              function parse(v) {
+                return v.replace(/^v/, "").split(".").map(n => parseInt(n, 10) || 0);
+              }
+              function isGte(v1, v2) {
+                const [a1, a2, a3] = parse(v1);
+                const [b1, b2, b3] = parse(v2);
+                if (a1 !== b1) return a1 > b1;
+                if (a2 !== b2) return a2 > b2;
+                return a3 >= b3;
+              }
+
+              let targetVersion = currentPkg;
+              if (latestNpm !== "0.0.0" && isGte(latestNpm, currentPkg)) {
+                const [major, minor, patch] = parse(latestNpm);
+                if (bumpType === "major") targetVersion = `${major + 1}.0.0`;
+                else if (bumpType === "minor") targetVersion = `${major}.${minor + 1}.0`;
+                else targetVersion = `${major}.${minor}.${patch + 1}`;
+              } else if (bumpType === "major" || bumpType === "minor" || bumpType === "patch") {
+                const [major, minor, patch] = parse(currentPkg);
+                if (bumpType === "major") targetVersion = `${major + 1}.0.0`;
+                else if (bumpType === "minor") targetVersion = `${major}.${minor + 1}.0`;
+                else targetVersion = `${major}.${minor}.${patch + 1}`;
+              }
+              console.log(targetVersion);
+            ' "$CURRENT_PKG" "$LATEST_NPM" "${{ inputs.bump || 'auto' }}")
+
+            echo "Setting package version to: $TARGET_VERSION"
+            npm version "$TARGET_VERSION" --no-git-tag-version --allow-same-version
           fi
 
           FINAL_VERSION=$(node -p "require('./package.json').version")

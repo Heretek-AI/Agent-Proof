@@ -3,13 +3,13 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-describe('Platform-Specific Binary Packaging & Launcher', () => {
+describe('Platform-Specific Packaging & Launcher', () => {
   const rootDir = path.resolve(__dirname, '..');
   const pkgJsonPath = path.join(rootDir, 'package.json');
   const binScriptPath = path.join(rootDir, 'bin', 'agent-proof.js');
   const binGateScriptPath = path.join(rootDir, 'bin', 'agent-gate.js');
 
-  it('has package.json configured with complete optionalDependencies matrix pinning', () => {
+  it('has package.json configured with zero runtime dependencies and valid bin entrypoints', () => {
     const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8'));
 
     expect(pkg.name).toBe('@heretek-ai/agent-proof');
@@ -19,16 +19,8 @@ describe('Platform-Specific Binary Packaging & Launcher', () => {
     expect(pkg.bin['agent-gate']).toBe('./bin/agent-gate.js');
     expect(pkg.bin['create-agent-gate']).toBe('./bin/agent-gate.js');
 
-    const optDeps = pkg.optionalDependencies;
-    expect(optDeps).toBeDefined();
-
-    // Verify Darwin (macOS), Linux, and Windows matrices for both x64 and arm64
-    expect(optDeps['@heretek-ai/binary-darwin-arm64']).toBeDefined();
-    expect(optDeps['@heretek-ai/binary-darwin-x64']).toBeDefined();
-    expect(optDeps['@heretek-ai/binary-linux-arm64']).toBeDefined();
-    expect(optDeps['@heretek-ai/binary-linux-x64']).toBeDefined();
-    expect(optDeps['@heretek-ai/binary-win32-arm64']).toBeDefined();
-    expect(optDeps['@heretek-ai/binary-win32-x64']).toBeDefined();
+    // Confirm zero runtime dependencies for lean distribution
+    expect(pkg.dependencies).toBeUndefined();
   });
 
   it('verifies bin/agent-proof.js and bin/agent-gate.js handle CLI options via fallback', () => {
