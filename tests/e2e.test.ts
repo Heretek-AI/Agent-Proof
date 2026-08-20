@@ -95,13 +95,9 @@ def process_data(data):
     });
 
     expect(output).toContain('Agent-Proof Mechanical Hard-Gate Initializer');
-    expect(output).toContain('Stacks detected: JavaScript/TypeScript, Python, Workflows/Infra, Agent Harness');
-    expect(output).toContain('Created lefthook.yml');
-    expect(output).toContain('Created .claude/hooks.json');
-    expect(output).toContain('Created .claude/settings.json');
-    expect(output).toContain('Created biome.json');
-    expect(output).toContain('Created ruff.toml');
-    expect(output).toContain('Created .aislop/config.yml');
+    expect(output).toContain('Detected Stacks: JavaScript/TypeScript, Python, Workflows/Infra, Agent Harness');
+    expect(output).toContain('Emitted 6 configs');
+    expect(output).toContain('Repository is now Agent-Proof!');
 
     // Verify files exist on disk
     expect(fs.existsSync(path.join(tempDir, 'lefthook.yml'))).toBe(true);

@@ -6,6 +6,10 @@
  * - init: Initialize mechanical hard gates in target repository
  * - detect: Run multi-stack inspection and print findings
  * - run <stage>: Execute a specific gate stage (post-edit, pre-commit, pre-push)
+ * - freeze: Freeze test suites and specifications against Builder modifications (Proof-Loop)
+ * - unfreeze: Unfreeze specifications for administrative test updates
+ * - sanitize: Sanitize raw log/tool streams to neutralize Agentjacking payloads
+ * - attest: Generate an in-toto compliant cryptographic Ed25519 provenance receipt
  * - lock: Apply read-only permissions (0444) to governance configurations
  * - unlock: Restore standard permissions (0644) for administrative edits
  * - status: Print current permission and lock status of governance files
@@ -18,6 +22,10 @@ import { generateConfigs } from './generator/configGenerator.js';
 import { installHooks } from './installer/hookInstaller.js';
 import { GateLock, lockGovernance, unlockGovernance } from './installer/lockin.js';
 import { GateRunner } from './runner/gateRunner.js';
+import { ByteFence } from './broker/byteFence.js';
+import { LSPSanitizer } from './sanitizer/lspSanitizer.js';
+import { ProvenanceEngine } from './attestation/provenance.js';
+import { SarifStreamer } from './formatter/sarifStream.js';
 
 /**
  * Retrieve the current package version dynamically from package.json
@@ -48,19 +56,25 @@ COMMANDS:
   init [dir]           Initialize 3-tier mechanical hard gates in target repository
   detect [dir]         Inspect repository architecture and report detected stacks
   run <stage> [file]   Execute a mechanical gate stage (post-edit, pre-commit, pre-push)
+  freeze [dir]         Freeze test suites & specifications against Builder modifications
+  unfreeze [dir]       Unfreeze specifications for authorized test updates
+  sanitize [file]      Sanitize raw log/tool streams to neutralize Agentjacking payloads
+  attest [dir]         Generate signed in-toto Ed25519 provenance attestation receipt
   lock [dir]           Lock governance files with read-only permissions (chmod 0444)
   unlock [dir]         Unlock governance files for administrative editing (chmod 0644)
   status [dir]         Display permission and lock status of governance configurations
 
 OPTIONS:
   -f, --force          Overwrite existing configuration files during init
+  --sarif              Output diagnostics in SARIF v2.1.0 format
   -v, --version        Show CLI version
   -h, --help           Show this help message
 
 EXAMPLES:
   $ npx @heretek-ai/agent-proof init
   $ npx @heretek-ai/agent-proof run pre-commit
-  $ npx @heretek-ai/agent-proof run post-edit src/auth.ts
+  $ npx @heretek-ai/agent-proof freeze
+  $ npx @heretek-ai/agent-proof attest
   $ npx @heretek-ai/agent-proof status
 `);
 }
@@ -98,55 +112,35 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
       // 1. Multi-Stack Inspection
       console.log(`🔍 [1/4] Inspecting repository multi-stack architecture...`);
       const detection = detectStack(targetDir);
-      console.log(`   • Stacks detected: ${detection.summary.primaryStacks.join(', ') || 'Generic'}`);
-      if (detection.jsTs.detected) {
-        console.log(`     - JS/TS: ${detection.jsTs.files.join(', ')} (TypeScript: ${detection.jsTs.hasTypeScript ? 'Yes' : 'No'}, Biome: ${detection.jsTs.hasBiome ? 'Yes' : 'No'})`);
-      }
-      if (detection.python.detected) {
-        console.log(`     - Python: ${detection.python.files.join(', ')} (Ruff: ${detection.python.hasRuffConfig ? 'Yes' : 'No'})`);
-      }
-      if (detection.infra.detected) {
-        console.log(`     - Infra/CI: ${[...detection.infra.workflowFiles, ...detection.infra.dockerFiles].join(', ')}`);
-      }
-      if (detection.agentHarness.detected) {
-        console.log(`     - Agent Harness: ${detection.agentHarness.files.join(', ')}`);
+      console.log(`   • Detected Stacks: ${detection.summary.primaryStacks.join(', ')} (${detection.summary.totalIndicators} signature files)`);
+
+      // 2. Generate Configurations
+      console.log(`⚙️  [2/4] Generating multi-tier mechanical governance configurations...`);
+      const genResult = generateConfigs(detection, {
+        cwd: targetDir,
+        overwrite: flags.has('-f') || flags.has('--force'),
+      });
+      console.log(`   • Emitted ${genResult.writtenFiles.length} configs: ${genResult.writtenFiles.join(', ')}`);
+      if (genResult.skippedFiles.length > 0) {
+        console.log(`   • Skipped existing: ${genResult.skippedFiles.join(', ')} (use -f to overwrite)`);
       }
 
-      // 2. Multi-Tier Config Emission
-      console.log(`\n⚙️  [2/4] Emitting multi-tier pipeline governance configs...`);
-      const overwrite = flags.has('-f') || flags.has('--force');
-      const genResult = generateConfigs(detection, { cwd: targetDir, overwrite });
-      for (const written of genResult.writtenFiles) {
-        console.log(`   ✅ Created ${written}`);
-      }
-      for (const skipped of genResult.skippedFiles) {
-        console.log(`   ⏩ Skipped existing ${skipped} (use --force to overwrite)`);
-      }
-
-      // 3. Git Hooks Installation
-      console.log(`\n🪝 [3/4] Initializing mechanical git hooks...`);
-      const hookResult = installHooks(targetDir);
+      // 3. Install Git Hooks
+      console.log(`🪝 [3/4] Installing mechanical Git pre-commit & pre-push hooks...`);
+      const hookResult = installHooks({ cwd: targetDir });
       console.log(`   • ${hookResult.message}`);
-      if (hookResult.installedHooks.length > 0) {
-        console.log(`   • Active hooks: ${hookResult.installedHooks.join(', ')}`);
-      }
 
-      // 4. Governance Lock-in
-      console.log(`\n🛡️  [4/4] Locking governance controls...`);
+      // 4. Lock Governance Permissions (chmod 0444)
+      console.log(`🛡️  [4/4] Enforcing POSIX read-only lock-in (chmod 0444)...`);
       const lockResult = lockGovernance(targetDir);
-      if (lockResult.lockedFiles.length > 0) {
-        console.log(`   🔒 Immutable read-only lock applied to: ${lockResult.lockedFiles.join(', ')}`);
-      }
+      console.log(`   • Locked ${lockResult.lockedFiles.length} files: ${lockResult.lockedFiles.join(', ')}`);
 
-      console.log(`\n✨ Repository is now Agent-Proof! Sub-second mechanical gates active.`);
-      console.log(`   Stage 1: Agent PostFileEdit tool interceptor (.claude/hooks.json)`);
-      console.log(`   Stage 2: Staged files pre-commit hard gate (< 2.0s via Lefthook)`);
-      console.log(`   Stage 3: Pre-push / CI codebase graph & shadow API audit\n`);
+      console.log(`\n✅ Repository is now Agent-Proof! Mechanical hard gates are active.\n`);
       break;
     }
 
     // -------------------------------------------------------------------------
-    // DETECT: Inspect and print detected stacks
+    // DETECT: Inspect stack without file modifications
     // -------------------------------------------------------------------------
     case 'detect': {
       const detection = detectStack(targetDir);
@@ -168,20 +162,78 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
           process.exit(1);
         }
         const envelope = runner.runPostEdit(filePath);
-        console.log(JSON.stringify(envelope, null, 2));
+        if (flags.has('--sarif')) {
+          console.log(SarifStreamer.formatSarifJson(envelope.diagnostics));
+        } else {
+          console.log(JSON.stringify(envelope, null, 2));
+        }
         if (envelope.status === 'GATE_FAILED') process.exit(1);
       } else if (stage === 'pre-commit') {
         const envelope = runner.runPreCommit();
-        console.log(JSON.stringify(envelope, null, 2));
+        if (flags.has('--sarif')) {
+          console.log(SarifStreamer.formatSarifJson(envelope.diagnostics));
+        } else {
+          console.log(JSON.stringify(envelope, null, 2));
+        }
         if (envelope.status === 'GATE_FAILED') process.exit(1);
       } else if (stage === 'pre-push') {
         const envelope = runner.runPrePush();
-        console.log(JSON.stringify(envelope, null, 2));
+        if (flags.has('--sarif')) {
+          console.log(SarifStreamer.formatSarifJson(envelope.diagnostics));
+        } else {
+          console.log(JSON.stringify(envelope, null, 2));
+        }
         if (envelope.status === 'GATE_FAILED') process.exit(1);
       } else {
         console.error(`Unknown stage: ${stage}. Expected: post-edit, pre-commit, pre-push`);
         process.exit(1);
       }
+      break;
+    }
+
+    // -------------------------------------------------------------------------
+    // FREEZE / UNFREEZE: Proof-Loop role separation & test freezing
+    // -------------------------------------------------------------------------
+    case 'freeze': {
+      const fence = new ByteFence(targetDir);
+      const config = fence.freezeSpecifications();
+      console.log(`🧊 Frozen ${Object.keys(config.pathDigests).length} test and spec files under proof-loop role separation.`);
+      break;
+    }
+
+    case 'unfreeze': {
+      const fence = new ByteFence(targetDir);
+      const unfrozen = fence.unfreezeSpecifications();
+      if (unfrozen) {
+        console.log(`🔓 Unfrozen test specifications for authorized administrative updates.`);
+      } else {
+        console.log(`⚪ No active frozen specification manifest found.`);
+      }
+      break;
+    }
+
+    // -------------------------------------------------------------------------
+    // SANITIZE: Agentjacking log sanitization
+    // -------------------------------------------------------------------------
+    case 'sanitize': {
+      const filePath = args[1];
+      let content = '';
+      if (filePath && fs.existsSync(filePath)) {
+        content = fs.readFileSync(filePath, 'utf-8');
+      } else {
+        content = fs.readFileSync(0, 'utf-8'); // Read stdin
+      }
+      const sanitized = LSPSanitizer.sanitize(content);
+      console.log(LSPSanitizer.wrapPassiveContract(sanitized));
+      break;
+    }
+
+    // -------------------------------------------------------------------------
+    // ATTEST: In-toto Ed25519 Provenance Attestation
+    // -------------------------------------------------------------------------
+    case 'attest': {
+      const attestation = ProvenanceEngine.createAttestation({ cwd: targetDir });
+      console.log(JSON.stringify(attestation, null, 2));
       break;
     }
 

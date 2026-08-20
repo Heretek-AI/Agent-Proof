@@ -293,3 +293,163 @@ export interface HookInstallResult {
   /** Status description message */
   message: string;
 }
+
+/**
+ * ByteFence Transactional Write Broker Types
+ */
+export interface ExactReplacePayload {
+  /** Target file path relative to repository root */
+  filePath: string;
+  /** Expected SHA-256 hash or raw string of the current file before mutation */
+  preimage: string;
+  /** New content candidate to write atomically */
+  candidate: string;
+  /** Agent role requesting the write (e.g. 'Builder' or 'Verifier') */
+  role?: 'Builder' | 'Verifier' | 'Admin';
+}
+
+export interface WriteReceipt {
+  /** Target file path */
+  filePath: string;
+  /** Status of transactional write */
+  status: 'COMMITTED' | 'REJECTED';
+  /** Preimage SHA-256 digest */
+  preimageSha256: string;
+  /** Candidate SHA-256 digest */
+  candidateSha256: string;
+  /** MEDIATED_PROVEN receipt identifier */
+  receiptId: string;
+  /** Timestamp in ISO 8601 */
+  timestamp: string;
+  /** Error message if rejected */
+  rejectionReason?: string;
+}
+
+export interface FrozenSpecConfig {
+  /** Glob patterns or paths frozen from Builder modifications */
+  frozenPatterns: string[];
+  /** Map of relative file paths to their SHA-256 hashes when frozen */
+  pathDigests: Record<string, string>;
+  /** Timestamp when frozen */
+  frozenAt: string;
+}
+
+/**
+ * SARIF v2.1.0 JSON Schema Types ($schema: https://json.schemastore.org/sarif-2.1.0.json)
+ */
+export interface SarifRegion {
+  startLine: number;
+  startColumn?: number;
+  endLine?: number;
+  endColumn?: number;
+}
+
+export interface SarifReplacement {
+  deletedRegion: SarifRegion;
+  insertedContent?: {
+    text: string;
+  };
+}
+
+export interface SarifArtifactChange {
+  artifactLocation: {
+    uri: string;
+  };
+  replacements: SarifReplacement[];
+}
+
+export interface SarifFix {
+  description: {
+    text: string;
+  };
+  artifactChanges: SarifArtifactChange[];
+}
+
+export interface SarifResult {
+  ruleId: string;
+  level: 'error' | 'warning' | 'note' | 'none';
+  message: {
+    text: string;
+  };
+  locations: Array<{
+    physicalLocation: {
+      artifactLocation: {
+        uri: string;
+      };
+      region?: SarifRegion;
+    };
+  }>;
+  fixes?: SarifFix[];
+}
+
+export interface SarifRun {
+  tool: {
+    driver: {
+      name: string;
+      version?: string;
+      informationUri?: string;
+      rules?: Array<{
+        id: string;
+        shortDescription: {
+          text: string;
+        };
+        helpUri?: string;
+      }>;
+    };
+  };
+  results: SarifResult[];
+}
+
+export interface SarifLog {
+  $schema: 'https://json.schemastore.org/sarif-2.1.0.json';
+  version: '2.1.0';
+  runs: SarifRun[];
+}
+
+/**
+ * Cryptographic Attestation & In-Toto Provenance Types
+ */
+export interface ProvenanceAttestation {
+  _type: 'https://in-toto.io/Statement/v0.1';
+  subject: Array<{
+    name: string;
+    digest: {
+      sha256: string;
+    };
+  }>;
+  predicateType: 'https://agent-proof.heretek.ai/attestation/v1';
+  predicate: {
+    verifier: string;
+    gateStage: GateStage;
+    status: 'PASSED' | 'FAILED';
+    timestamp: string;
+    nonce: string;
+    diagnosticSummary: {
+      totalErrors: number;
+      totalWarnings: number;
+    };
+  };
+  signature: {
+    keyId: string;
+    algorithm: 'Ed25519';
+    sig: string;
+    publicKey: string;
+  };
+}
+
+/**
+ * Failure Loop Breaker Types
+ */
+export interface ViolationSignature {
+  source: string;
+  rule_id: string;
+  file_path: string;
+}
+
+export interface LoopBreakerState {
+  consecutiveIdenticalCount: number;
+  lastSignature?: string;
+  history: string[];
+  tripped: boolean;
+}
+

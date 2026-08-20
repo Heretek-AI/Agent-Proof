@@ -22,6 +22,7 @@ import { parseHadolintOutput } from './parsers/hadolint.js';
 import { parseTfsecOutput, parseKubeScoreOutput } from './parsers/iac.js';
 import { parseAstGrepOutput } from './parsers/astgrep.js';
 import { parseGenericOutput } from './parsers/generic.js';
+import { LSPSanitizer } from '../sanitizer/lspSanitizer.js';
 
 /**
  * Options for configuring DiagnosticStreamer formatting
@@ -33,6 +34,8 @@ export interface DiagnosticStreamerOptions {
   executionTimeMs?: number;
   /** Optional tool name override */
   toolName?: string;
+  /** Output format: 'lsp' (default) or 'sarif' */
+  format?: 'lsp' | 'sarif';
 }
 
 /**
@@ -56,10 +59,11 @@ export class DiagnosticStreamer {
    * Route tool output to the appropriate specialized parser based on tool name heuristics.
    *
    * @param toolName Name of the executed tool
-   * @param output Raw terminal output string
+   * @param rawOutput Raw terminal output string
    * @returns Array of parsed DiagnosticItem objects
    */
-  public static parseToolOutput(toolName: string, output: string): DiagnosticItem[] {
+  public static parseToolOutput(toolName: string, rawOutput: string): DiagnosticItem[] {
+    const output = LSPSanitizer.sanitize(rawOutput);
     const lower = toolName.toLowerCase();
 
     // Check specific tools in deterministic priority order
