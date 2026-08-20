@@ -17,7 +17,11 @@ Welcome to **Agent-Proof** (`@heretek-ai/agent-proof`). This document establishe
    - **No Hallucinated Imports**: Only import from installed packages declared in `package.json` / `pyproject.toml` or verified relative paths within the project.
    - **Clean ASTs & Formatting**: Ensure code adheres to Biome / Ruff formatting standards without lint violations or dead code.
 
-3. **Autonomous Self-Correction Protocol**:
+3. **Strict Suppression Hygiene Protocol**:
+   - Never insert blind suppression comments (`// @ts-ignore`, `// @ts-nocheck`, `# noqa`, `// biome-ignore`, `// eslint-disable`) to bypass mechanical gates.
+   - Newly introduced suppression comments without documented human rationale will trigger blocking **Severity 1** failures (`AI_SLOP_UNAUTHORIZED_SUPPRESSION`).
+
+4. **Autonomous Self-Correction Protocol**:
    - When a mechanical gate fails, parse the emitted **LSP Diagnostic Envelope** (`https://json.schemastore.org/lsif.json`).
    - Extract the `repair_tokens` provided in `diagnostics[].repair_instruction` to apply deterministic fixes immediately rather than guessing or engaging in trial-and-error edits.
 
@@ -25,11 +29,11 @@ Welcome to **Agent-Proof** (`@heretek-ai/agent-proof`). This document establishe
 
 ## 🏗️ 3-Tier Mechanical Gate Architecture
 
-| Stage | Trigger Event | Latency Target | Scope | Canonical Engines |
+| Stage | Trigger Event | Latency Target | Scope | Canonical Compiled Engines |
 | :--- | :--- | :--- | :--- | :--- |
-| **Stage 1: Pre-Tool / Edit** | `PostFileEdit` agent hook | `< 300ms` | Single modified file AST | Biome (`--write`), Ruff (`--fix`), SkillCheck |
-| **Stage 2: Hard Git Gate** | `git commit` (Pre-Commit) | `< 2.0s` | Staged blobs (`--staged`) | Lefthook parallel: Biome, Ruff, AISlop, TruffleHog, Typos, Actionlint |
-| **Stage 3: CI & Graph Audit** | `git push` / PR Pipeline | Unconstrained | Full codebase graph | Fallow (dead code / arch drift), Sherif (monorepo), OWASP Noir (API surface) |
+| **Stage 1: Pre-Tool / Edit** | `PostFileEdit` agent hook | `< 50ms` | Single modified file AST | Biome (`--write`), Ruff (`--fix`), Hadolint, Zizmor, SkillCheck, ast-grep |
+| **Stage 2: Hard Git Gate** | `git commit` (Pre-Commit) | `< 2.0s` | Staged blobs (`--staged`) | Lefthook parallel: Biome, Ruff, Tach, AISlop, TruffleHog, Typos, Actionlint, Zizmor, Hadolint, Tfsec, Kube-Score |
+| **Stage 3: CI & Graph Audit** | `git push` / PR Pipeline | Unconstrained | Full codebase graph | Fallow (dead code / circular deps), Sherif (monorepo), OWASP Noir (API surface), Cargo Deny |
 
 ---
 
@@ -41,10 +45,10 @@ Agent-Proof/
 │   ├── agent-proof.js          # Primary CLI launcher with optionalDependencies resolution
 │   └── agent-gate.js           # Compatibility alias launcher
 ├── src/                        # TypeScript source code
-│   ├── detector/               # Multi-stack auto-detection engine (JS/TS, Python, Go, Rust, C/C++, C#, Java, Ruby, Elixir)
+│   ├── detector/               # Multi-stack auto-detection engine (JS/TS, Python, Go, Rust, C/C++, C#, Java, Ruby, Elixir, Docker, Terraform, K8s)
 │   ├── generator/              # Multi-tier configuration generator & templates (Lefthook, Biome, Ruff, Claude Hooks, AISlop)
 │   ├── formatter/              # ANSI-stripper & LSP diagnostic streaming engine (LSIF schema compliant)
-│   │   └── parsers/            # Specialized tool parsers (aislop, biome, ruff, skillcheck, trufflehog, typos, actionlint)
+│   │   └── parsers/            # Specialized tool parsers (aislop, biome, ruff, skillcheck, trufflehog, typos, actionlint, zizmor, hadolint, iac, astgrep)
 │   ├── installer/              # Git hook installer & POSIX permission lock-in (chmod 0444)
 │   ├── runner/                 # Mechanical gate stage execution runner
 │   ├── types/                  # TypeScript interfaces and schema types
@@ -107,28 +111,28 @@ When deploying autonomous multi-agent swarms or delegating tasks, adhere to the 
 - **Mission**: Enforce modular separation of concerns, layer isolation, and prevent cyclic dependency drift.
 - **Rules**:
   - Domain / core logic must never import transport, UI, or external adapter layers.
-  - Intercept tight coupling between independent modules before code is staged.
-  - Verify package boundaries in monorepo structures.
+  - Intercept tight coupling between independent modules before code is staged using `Tach`, `fallow`, and `ast-grep`.
+  - Verify package boundaries in monorepo structures using `Sherif`.
 
 ### 2. Security & Secret Reviewer (`security-reviewer`)
 - **Mission**: Block credential leaks, injection vectors, and unauthorized privilege escalation.
 - **Rules**:
-  - Prohibit hardcoded high-entropy API tokens, private keys, or credentials.
-  - Validate all external inputs with schema parsers (e.g. Zod) before processing.
-  - Enforce OWASP API security boundaries and check for path traversal vulnerabilities.
+  - Prohibit hardcoded high-entropy API tokens, private keys, or credentials (`TruffleHog`).
+  - Audit GitHub Actions workflows for expression injection and unpinned actions (`zizmor`).
+  - Validate Dockerfiles and Kubernetes manifests (`hadolint`, `kube-score`, `tfsec`).
 
 ### 3. Performance & Memory Optimizer (`performance-optimizer`)
 - **Mission**: Prevent algorithmic bottlenecks, memory leaks, and blocking operations.
 - **Rules**:
   - Eliminate synchronous blocking I/O on hot execution paths.
   - Ensure unhandled Promise rejections and dangling event listeners are remediated.
-  - Optimize AST traversals and file operations using streams and file descriptors.
+  - Utilize zero-bloat compiled binaries to maintain sub-50ms editor feedback loops.
 
 ### 4. Test & Verification Engineer (`test-engineer`)
 - **Mission**: Author comprehensive, deterministic unit and integration tests.
 - **Rules**:
   - Every new feature or parser must include unit tests with 100% path coverage.
-  - Never author non-deterministic tests that depend on network calls or unpinned timers.
+  - Never author non-deterministic tests that depend on unpinned network calls or timers.
   - Validate failure branches and verify that repair tokens produce clean, passing builds.
 
 ---
@@ -137,4 +141,4 @@ When deploying autonomous multi-agent swarms or delegating tasks, adhere to the 
 
 - **NPM Package**: `@heretek-ai/agent-proof` published to `https://registry.npmjs.org/@heretek-ai/agent-proof`.
 - **Publishing Method**: OpenID Connect (OIDC) **Trusted Publishing** via `.github/workflows/publish.yml` with `id-token: write` and npm provenance.
-- **Dependencies**: Keep runtime dependencies at zero. All utilities are compiled into `dist/` or distributed via platform-specific binary packages under `optionalDependencies`.
+- **Dependencies**: Zero runtime dependencies. Compiled into `dist/` with native acceleration via optional binary packages.

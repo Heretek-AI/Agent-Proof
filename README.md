@@ -1,6 +1,6 @@
 # @heretek-ai/agent-proof 🔒
 
-> **Mechanical Hard-Gate for Autonomous AI Coding Agents** — Zero-dependency multi-tier code governance, sub-second post-edit interceptors, pre-commit gates, and LSP diagnostic envelopes for Claude Code, Antigravity, Cursor, Codex, and Aider.
+> **Zero-Bloat Mechanical Hard-Gate for Autonomous AI Coding Agents** — Deterministic multi-tier code governance, sub-50ms post-edit interceptors, sub-2.0s pre-commit gates, strict suppression hygiene, and LSP diagnostic envelopes with repair tokens for Claude Code, Antigravity, Cursor, Codex, and Aider.
 
 [![npm version](https://img.shields.io/npm/v/@heretek-ai/agent-proof.svg?style=flat-square&color=blue)](https://www.npmjs.com/package/@heretek-ai/agent-proof)
 [![CI Test Suite](https://github.com/Heretek-AI/Agent-Proof/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/Heretek-AI/Agent-Proof/actions/workflows/ci.yml)
@@ -15,14 +15,36 @@
 
 ## 🎯 Executive Overview
 
-Prompt-based guardrails (`CLAUDE.md`, `.cursorrules`, `rules.md`) inevitably degrade under context saturation. When autonomous AI coding agents execute multi-file refactors, they frequently introduce **AI Slop**:
-- **Swallowed Errors**: Empty catch blocks (`try { ... } catch (e) {}`) that mask production outages.
-- **Unsafe Type Casting**: `as any` or unchecked type assertions that bypass type safety.
+Prompt-based guardrails (`CLAUDE.md`, `.cursorrules`, `rules.md`, system prompts) inevitably degrade under context saturation and complex multi-file refactoring tasks. When autonomous AI coding agents make rapid edits, they frequently introduce **AI Slop**:
+- **Swallowed Errors & Empty Catch Blocks**: `try { ... } catch (e) {}` that mask outages.
+- **Strict Suppression Bypass**: Blindly inserting `// @ts-ignore`, `// biome-ignore`, or `# noqa` to bypass checks without fixing underlying bugs.
+- **Unsafe Type Casting**: Pervasive `as any` or unchecked type assertions that erode type safety.
 - **Hallucinated Dependencies**: Imports from packages not declared in `package.json` or `pyproject.toml`.
-- **Architectural Drift**: Tight coupling, circular imports, or unauthorized file modifications.
-- **Governance Tampering**: Agents weakening or deleting lint configs to bypass validation.
+- **Architectural Drift & Circular Imports**: Breaking modular isolation boundaries and leaking domain abstractions.
+- **Governance Tampering**: Agents weakening or modifying linter configs (`biome.json`, `ruff.toml`, `lefthook.yml`) to pass commits.
 
-**Agent-Proof** replaces soft prompt instructions with **deterministic, multi-tier mechanical hard gates**: native binary pipelines and lifecycle interceptors that physically prevent non-compliant code from reaching version control.
+**Agent-Proof** replaces soft prompt instructions with **deterministic, zero-bloat mechanical hard gates**: standalone compiled native binaries (Rust, Go) and lifecycle interceptors that physically prevent non-compliant code from reaching version control.
+
+---
+
+## ⚡ The Zero-Bloat Compiled Native Engine Philosophy
+
+Traditional verification frameworks rely on heavy interpreted runtimes (Python venvs, JVMs, Ruby VMs, deep Node.js trees) that introduce 1.2s – 4.0s of startup latency. Agent-Proof strictly enforces **compiled, standalone native binaries** executing in single-digit to low double-digit milliseconds:
+
+| Candidate Tool | Target Ecosystem | Engine / Binary Language | Latency Profile | Architectural Verdict | Primary Justification |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **ast-grep** | Polyglot (25+ Languages) | Rust (Tree-sitter Engine) | 5 ms – 20 ms | **Keeper (Stage 1 & 2)** | Ultra-fast structural AST search & pattern rewriting; zero runtime bloat. |
+| **Biome** | JS / TS / JSON / CSS | Rust (Compiled Binary) | 5 ms – 25 ms | **Keeper (Stage 1 & 2)** | Sub-millisecond formatting and linting replacing ESLint + Prettier. |
+| **Ruff** | Python | Rust (Compiled Binary) | 10 ms – 30 ms | **Keeper (Stage 1 & 2)** | Replaces Flake8, Isort, and Bandit with a 100x speedup. |
+| **Tach** | Python Architecture | Rust (Compiled Binary) | 10 ms – 25 ms | **Keeper (Stage 1 & 2)** | Enforces modular import boundaries and prevents architectural drift. |
+| **fallow** | JS / TS Graph Intelligence | Rust (Oxc Parser Engine) | 15 ms – 50 ms | **Keeper (Stage 3)** | Fast dead code, unused exports, circular imports, and complexity hotspots. |
+| **zizmor** | GitHub Actions / CI | Rust (Compiled Binary) | 15 ms – 40 ms | **Keeper (Stage 1 & 2)** | Workflow security audit: expression injection, unpinned action SHAs. |
+| **hadolint** | Docker / Containers | Haskell / Rust Binary | 10 ms – 30 ms | **Keeper (Stage 1 & 2)** | Standalone Dockerfile static analysis and root user detection. |
+| **tfsec** | Terraform / IaC | Go (Compiled Binary) | 30 ms – 80 ms | **Keeper (Stage 1 & 2)** | Static cloud security misconfiguration scanner. |
+| **kube-score** | Kubernetes YAML | Go (Compiled Binary) | 15 ms – 45 ms | **Keeper (Stage 1 & 2)** | Security analysis of Kubernetes manifests and pod security contexts. |
+| **gosec & revive** | Go | Go (Compiled Binary) | 20 ms – 80 ms | **Keeper (Stage 1 & 2)** | Static Go security scanning and idiomatic linting. |
+| **cargo-deny** | Rust | Rust (Compiled Binary) | 20 ms – 60 ms | **Keeper (Stage 2 & 3)** | Dependency, license, and security advisory verification. |
+| **ESLint / PMD / Bandit** | Polyglot | Node.js / JVM / PyEnv | 1,200 ms – 4,000 ms | **Culled / Misfits** | High process startup latency; violates sub-second agent pairing loop. |
 
 ---
 
@@ -30,25 +52,50 @@ Prompt-based guardrails (`CLAUDE.md`, `.cursorrules`, `rules.md`) inevitably deg
 
 ```mermaid
 flowchart TD
-    A[AI Coding Agent / Developer] -->|File Modification| B[Stage 1: Agent Tool Interception]
-    B -->|sub-300ms single AST| C{Biome / Ruff / SkillCheck}
-    C -->|Failure| D[LSP Diagnostic Streamer\nJSON Envelope + Repair Tokens]
+    A[AI Coding Agent / Developer] -->|File Modification| B[Stage 1: Agent Tool Interceptor]
+    B -->|sub-50ms single AST| C{Biome / Ruff / hadolint / zizmor / ast-grep}
+    C -->|Failure| D[LSP Diagnostic Streamer\nLSIF Envelope + Repair Tokens]
     D -->|Autonomous Self-Correction| A
     C -->|Success| E[Git Staging Area]
     E -->|git commit| F[Stage 2: Pre-Commit Hard Gate]
-    F -->|sub-2.0s parallel native| G[Lefthook Runner\nBiome + Ruff + AISlop + TruffleHog + Typos + Actionlint]
+    F -->|sub-2.0s parallel native| G[Lefthook Parallel Runner\nBiome + Ruff + Tach + AISlop + TruffleHog + Typos + Actionlint + Zizmor + Hadolint + Tfsec]
     G -->|Commit Passed| H[Git Working Tree]
     H -->|git push / CI| I[Stage 3: CI & Codebase Graph Governance]
-    I -->|Full Graph Analysis| J[Fallow Audit + Sherif + OWASP Noir]
+    I -->|Full Graph Analysis| J[Fallow Audit + Sherif + OWASP Noir + Cargo Deny]
 ```
 
 ### Execution Stage SLA Matrix
 
 | Stage | Trigger Event | Latency Target | Scope | Canonical Engines |
 | :--- | :--- | :--- | :--- | :--- |
-| **Stage 1: Pre-Tool / Edit** | `PostFileEdit` agent hook | `< 300ms` | Single modified file AST | Biome (`--write`), Ruff (`--fix`), SkillCheck |
-| **Stage 2: Hard Git Gate** | `git commit` (Pre-Commit) | `< 2.0s` | Staged blobs (`--staged`) | Lefthook parallel: Biome, Ruff, AISlop, TruffleHog, Typos, Actionlint |
-| **Stage 3: CI & Graph Audit** | `git push` / PR Pipeline | Unconstrained | Full codebase graph | Fallow (dead code / arch drift), Sherif (monorepo), OWASP Noir (API surface) |
+| **Stage 1: Pre-Tool / Edit** | `PostFileEdit` agent hook | `< 50ms` | Single modified file AST | Biome (`--write`), Ruff (`--fix`), Hadolint, Zizmor, SkillCheck |
+| **Stage 2: Hard Git Gate** | `git commit` (Pre-Commit) | `< 2.0s` | Staged blobs (`--staged`) | Lefthook parallel: Biome, Ruff, Tach, AISlop, TruffleHog, Typos, Actionlint, Zizmor, Hadolint, Tfsec, Kube-Score, ast-grep |
+| **Stage 3: CI & Graph Audit** | `git push` / PR Pipeline | Unconstrained | Full codebase graph | Fallow (dead exports / circular deps), Sherif (monorepos), OWASP Noir (API attack surface) |
+
+---
+
+## 🛡️ Strict Suppression Hygiene Gate
+
+Agents frequently attempt to bypass mechanical gates by inserting blind suppression comments (`// @ts-ignore`, `// biome-ignore`, `# noqa`, `// eslint-disable`).
+
+Agent-Proof's **Suppression Hygiene Gate** treats newly inserted unapproved suppression markers as blocking **Severity 1** violations:
+
+```json
+{
+  "source": "aislop",
+  "rule_id": "AI_SLOP_UNAUTHORIZED_SUPPRESSION",
+  "severity": "ERROR",
+  "file_path": "src/auth.ts",
+  "error_message": "Unauthorized @ts-ignore suppression comment inserted to bypass type checking.",
+  "repair_instruction": {
+    "action": "REWRITE_BLOCK",
+    "description": "Remove unauthorized suppression comment. Fix the underlying type or lint issue rather than bypassing governance.",
+    "repair_tokens": [
+      "// Remove suppression comment and fix root cause with type guards or explicit handling"
+    ]
+  }
+}
+```
 
 ---
 
@@ -64,7 +111,7 @@ npx @heretek-ai/agent-proof init
 npx create-agent-proof
 npx create-agent-gate
 
-# Or install globally / locally
+# Or install as dev dependency
 npm install -D @heretek-ai/agent-proof
 npx agent-proof init
 ```
@@ -81,7 +128,7 @@ agent-proof init [directory]
 agent-proof detect [--json]
 
 # Run mechanical gate stages directly
-agent-proof run post-edit <filePath>   # Stage 1: PostFileEdit hook (< 300ms)
+agent-proof run post-edit <filePath>   # Stage 1: PostFileEdit hook (< 50ms)
 agent-proof run pre-commit            # Stage 2: Staged files hard gate (< 2.0s)
 agent-proof run pre-push              # Stage 3: Full codebase graph audit
 
@@ -96,29 +143,29 @@ agent-proof unlock                    # Temporarily unlock for admin maintenance
 
 ---
 
-## 📦 Polyglot Multi-Stack Auto-Detection
+## 📦 Polyglot Multi-Stack Auto-Detection Matrix
 
-Agent-Proof automatically inspects the target repository and tailors sub-second native check pipelines across polyglot ecosystems:
+Agent-Proof automatically inspects polyglot repositories and configures appropriate native compiled engines:
 
-| Ecosystem | Detected Project Markers | Enforced Hard-Gate Engines |
+| Ecosystem / Stack | Detection Indicators | Generated Mechanical Engine |
 | :--- | :--- | :--- |
-| **JavaScript / TypeScript** | `package.json`, `tsconfig.json`, `pnpm-workspace.yaml`, `biome.json` | **Biome** (Formatting & Linting), **AISlop** (Anti-patterns) |
-| **Python** | `pyproject.toml`, `requirements.txt`, `Pipfile`, `ruff.toml` | **Ruff** (AST Linting & Auto-fix), **AISlop** |
-| **Go** | `go.mod`, `go.sum` | **Gosec** (Static Security Analysis) |
-| **Rust** | `Cargo.toml`, `Cargo.lock` | **Cargo Deny** (Dependency, License & Advisory Gate) |
-| **C / C++** | `CMakeLists.txt`, `Makefile`, `compile_commands.json` | **Clang-Format**, **Clang-Tidy** |
-| **C# / .NET** | `*.csproj`, `*.sln`, `global.json` | **Dotnet Format** |
-| **Java** | `pom.xml`, `build.gradle`, `build.gradle.kts` | **Checkstyle**, **SpotBugs** |
-| **Ruby** | `Gemfile`, `.rubocop.yml` | **Rubocop** |
-| **Elixir** | `mix.exs` | **Mix Credo** |
-| **Infrastructure & CI** | `.github/workflows/*.yml`, `Dockerfile` | **Actionlint**, **TruffleHog**, **Typos** |
-| **Agent Harnesses** | `.claude/`, `.cursor/`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` | **Hook Interceptors** (`PostFileEdit`, `PreCommit`) |
+| **JavaScript / TypeScript** | `package.json`, `tsconfig.json`, `biome.json` | Biome (`--write`, `--staged`) + Fallow Audit |
+| **Python** | `pyproject.toml`, `requirements.txt`, `Pipfile` | Ruff (`--fix`, `--staged`) + Tach (architecture) |
+| **Go** | `go.mod`, `go.sum` | gosec (`-quiet`) + revive |
+| **Rust** | `Cargo.toml`, `Cargo.lock` | cargo deny check |
+| **C / C++** | `CMakeLists.txt`, `Makefile`, `compile_commands.json` | clang-format (`--Werror`) |
+| **C# / .NET** | `*.csproj`, `*.sln`, `global.json` | dotnet format (`--verify-no-changes`) |
+| **GitHub Actions / CI** | `.github/workflows/*.{yml,yaml}` | Actionlint + Zizmor (workflow security) |
+| **Docker / Containers** | `Dockerfile*`, `Containerfile*`, `docker-compose.yml` | Hadolint (container security) |
+| **Terraform / IaC** | `*.tf`, `*.tfvars`, `terraform/` | Tfsec (cloud security static analysis) |
+| **Kubernetes** | `k8s/`, `kubernetes/`, `helm/`, `*.k8s.yml` | Kube-Score (pod security context analysis) |
+| **AI Agent Harnesses** | `.claude/`, `CLAUDE.md`, `.cursor/`, `SKILL.md` | Claude Hooks + SkillCheck + Permission Lock-in |
 
 ---
 
-## 📡 LSP Diagnostic Streamer & Autonomous Repair Tokens
+## 📡 LSP Diagnostic Envelopes & Autonomous Auto-Repair
 
-When a mechanical gate intercepts an issue, Agent-Proof converts raw terminal output into an **LSP Diagnostic Envelope** (`https://json.schemastore.org/lsif.json`) containing actionable **`repair_tokens`** so autonomous agents can self-correct deterministically:
+When any mechanical gate fails, Agent-Proof strips ANSI terminal codes and formats the error stream into a standard **LSP Diagnostic Envelope** ([`https://json.schemastore.org/lsif.json`](https://json.schemastore.org/lsif.json)):
 
 ```json
 {
@@ -135,18 +182,18 @@ When a mechanical gate intercepts an issue, Agent-Proof converts raw terminal ou
       "source": "aislop",
       "rule_id": "AI_SLOP_SWALLOWED_ERROR",
       "severity": "ERROR",
-      "file_path": "server/utils/auth.ts",
+      "file_path": "src/auth/session.ts",
       "range": {
         "start": { "line": 42, "column": 5 },
-        "end": { "line": 46, "column": 6 }
+        "end": { "line": 44, "column": 6 }
       },
-      "code_snippet": "try {\n  await verifySession(token);\n} catch (e) {}",
-      "error_message": "AI-Slop Pattern Detected: Empty catch block silently suppresses authentication failure.",
+      "error_message": "Empty catch block silently swallows authentication failure.",
       "repair_instruction": {
         "action": "REWRITE_BLOCK",
-        "description": "Handle the exception explicitly. Either log the error, rethrow with cause, or return an explicit failure result.",
+        "description": "Handle the exception explicitly. Either log the error, rethrow a custom Error, or return an explicit failure response.",
         "repair_tokens": [
-          "throw new AuthException('Session verification failed', { cause: e });"
+          "import { AppError } from '../errors';",
+          "throw new AppError('Operation failed', { cause: error });"
         ]
       }
     }
@@ -156,62 +203,26 @@ When a mechanical gate intercepts an issue, Agent-Proof converts raw terminal ou
 
 ---
 
-## 🛡️ Immutable Governance Permission Lock-In
+## 🔒 Immutable File Locking Protocol
 
-To prevent AI coding agents from modifying governance rules, weakening linter settings, or disabling hooks, Agent-Proof applies immutable filesystem permissions (`chmod 0444` / read-only) to:
-
-- `.claude/settings.json`
-- `.claude/hooks.json`
-- `lefthook.yml`
-- `biome.json`
-- `ruff.toml`
-- `.aislop/config.yml`
-
-Any direct file write attempt by an agent fails immediately with `EACCES (Permission Denied)`.
-
----
-
-## 🧪 Real-World E2E Test Suite (`Heretek-AI/drop`)
-
-Agent-Proof is continuously validated against real-world production codebases. The automated E2E test suite:
-1. Clones [`Heretek-AI/drop`](https://github.com/Heretek-AI/drop) (a full-stack Nuxt/Vue/TypeScript & Nitro game distribution platform).
-2. Initializes `@heretek-ai/agent-proof` and locks governance controls.
-3. Fetches live open issues from [`Drop-OSS/drop`](https://github.com/Drop-OSS/drop/issues).
-4. Drives Claude Code under active mechanical gate interception using organization LLM endpoints.
-5. Verifies sub-second `PostFileEdit` formatting and sub-2.0s pre-commit validation.
+To prevent autonomous agents from modifying or deleting governance configs during execution, Agent-Proof enforces a POSIX permission lock (`chmod 0444`):
 
 ```bash
-# Run real-world E2E test suite locally
-npm run test:e2e-drop
+# Verify locked configuration files
+agent-proof status
 
-# Run sandbox lifecycle validation
-npm run test:real-repo
-
-# Run full Vitest test suite
-npm test
+# Output:
+# 🛡️ Governance Configuration Status:
+#    🔒 [LOCKED] .claude/settings.json (mode: 444)
+#    🔒 [LOCKED] .claude/hooks.json (mode: 444)
+#    🔒 [LOCKED] lefthook.yml (mode: 444)
+#    🔒 [LOCKED] biome.json (mode: 444)
+#    🔒 [LOCKED] ruff.toml (mode: 444)
+#    🔒 [LOCKED] .aislop/config.yml (mode: 444)
 ```
 
 ---
 
-## 🤖 Multi-Agent Ecosystem Compatibility
+## 📜 License
 
-Agent-Proof integrates out of the box with all leading AI coding assistants and autonomous agents:
-
-- **Claude Code (`claude`)**: Direct lifecycle hook integration via `.claude/hooks.json` (`PostFileEdit` & `PreCommit`).
-- **Google Gemini & Antigravity**: Seamless paired programming workflow with `GEMINI.md` and MCP server integration.
-- **Cursor / Windsurf**: Parallel pre-commit hard gates and background diagnostics.
-- **Aider / Codex / Devin**: Sub-second pre-commit git gates preventing invalid commits before PR creation.
-
----
-
-## 🔒 Security & Supply Chain Integrity
-
-- **Zero Runtime Dependencies**: Core CLI bundle compiles down to zero third-party dependencies.
-- **Trusted Publishing (OIDC)**: Published to npm via GitHub Actions OIDC Trusted Publishing with cryptographic Sigstore provenance.
-- **TOCTOU Safe**: Atomic file write flags (`wx`/`w`) preventing filesystem race conditions.
-
----
-
-## 📄 License
-
-MIT © [Heretek-AI](https://github.com/Heretek-AI)
+MIT © [Heretek AI](https://github.com/Heretek-AI)

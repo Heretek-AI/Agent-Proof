@@ -36,13 +36,13 @@ node bin/agent-proof.js status
 Agent-Proof is structured into modular components:
 
 1. **Stack Detector (`src/detector/stackDetector.ts`)**:
-   - Inspects target repository indicators (JS/TS, Python, Go, Rust, C/C++, C#, Java, Ruby, Elixir, GitHub Workflows, Docker, Claude Agent Harness).
+   - Inspects target repository indicators (JS/TS, Python, Go, Rust, C/C++, C#, Java, Ruby, Elixir, GitHub Workflows, Docker, Terraform, Kubernetes, Claude Agent Harness, Tach, AST-Grep).
 2. **Config Generator (`src/generator/configGenerator.ts`)**:
    - Generates `lefthook.yml`, `.claude/hooks.json`, `biome.json`, `ruff.toml`, and `.aislop/config.yml`.
 3. **Diagnostic Streamer (`src/formatter/diagnosticStream.ts`)**:
-   - Converts raw stderr/stdout from tools (`aislop`, `biome`, `ruff`, `skillcheck`, `trufflehog`, `typos`, `actionlint`) into an LSP-compliant JSON diagnostic envelope with `repair_tokens`.
+   - Converts raw stderr/stdout from tools (`aislop`, `biome`, `ruff`, `skillcheck`, `trufflehog`, `typos`, `actionlint`, `zizmor`, `hadolint`, `tfsec`, `kubescore`, `astgrep`) into an LSP-compliant JSON diagnostic envelope with `repair_tokens`.
 4. **Hook Installer & Lock-in (`src/installer/`)**:
-   - Sets up `.git/hooks/pre-commit` and locks governance files to read-only (`0o444`).
+   - Sets up `.git/hooks/pre-commit` and locks governance files to read-only (`chmod 0444`).
 5. **Gate Runner (`src/runner/gateRunner.ts`)**:
    - Executes gate stages (`post-edit`, `pre-commit`, `pre-push`).
 6. **Binary Launchers (`bin/agent-proof.js` & `bin/agent-gate.js`)**:
@@ -58,8 +58,10 @@ When Claude Code operates in a repository initialized with Agent-Proof:
    - Fires automatically whenever Claude modifies a file.
    - For `*.{js,ts,jsx,tsx}`, runs `npx @biomejs/biome check --write ${filePath}`.
    - For `*.py`, runs `ruff check --fix ${filePath}`.
+   - For `.github/workflows/*.{yml,yaml}`, runs `zizmor ${filePath}`.
+   - For `Dockerfile*` / `Containerfile*`, runs `hadolint ${filePath}`.
    - For `.claude/skills/*.md` or `SKILL.md`, runs `skillcheck check ${filePath}`.
-   - Runs in `< 300ms` on single modified ASTs.
+   - Runs in `< 50ms` on single modified ASTs.
 
 2. **`PreCommit` Lifecycle Event**:
    - Fires when git commit is initiated.
@@ -91,4 +93,5 @@ When Claude Code operates in a repository initialized with Agent-Proof:
 
 - **Do NOT** bypass git hooks using `--no-verify`.
 - **Do NOT** attempt to edit or delete `.claude/settings.json`, `.claude/hooks.json`, or `lefthook.yml`. These files are marked read-only (`chmod 0444`) to enforce governance boundaries.
+- **Do NOT** insert blind suppression comments (`// @ts-ignore`, `// biome-ignore`, `# noqa`) to bypass type safety or lint rules.
 - **Do NOT** introduce empty catch blocks, `as any` casts, or unverified imports.
